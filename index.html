@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ===== BASE STYLES ===== */
     * {
@@ -3228,7 +3229,7 @@
       <button class="nav-item" data-screen="pipeline"><i class="fas fa-columns"></i><span>Pipeline</span></button>
       <button class="nav-item" data-screen="simulator"><i class="fas fa-cog"></i><span>Simulator</span></button>
     </div>
-    <div class="deploy-note">⚡ Deployed on GitHub · Data stored in browser (localStorage)</div>
+    <div class="deploy-note">⏳ Connecting to cloud…</div>
   </div>
 
   <!-- =============================== -->
@@ -3261,6 +3262,214 @@
 
       function saveToStorage(key, data) {
         localStorage.setItem(key, JSON.stringify(data));
+      }
+
+      // ================================================================
+      // 1B. SUPABASE CLOUD SYNC
+      // ================================================================
+      const SUPABASE_URL = "https://nbpvamrwzqrgoiwpadwc.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_GrJ_9z_y903WFMGjoAg82Q_cG3N2_Jx";
+      const sb = (window.supabase && window.supabase.createClient)
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+        : null;
+
+      function setSyncStatus(text) {
+        const el = document.querySelector('.deploy-note');
+        if (el) el.textContent = text;
+      }
+
+      function leadToRow(lead) {
+        return {
+          id: lead.id,
+          borrower: lead.borrower || {},
+          co_applicants: lead.coApplicants || [],
+          "references": lead.references || [],
+          loan_type: lead.loanType || null,
+          loan_amount: lead.loanAmount || null,
+          credit: lead.credit || null,
+          institution_type: lead.institutionType || null,
+          institution_name: lead.institutionName || null,
+          assigned_ba: lead.assignedBA || null,
+          assigned_legal: lead.assignedLegal || null,
+          assigned_technical: lead.assignedTechnical || null,
+          bt_top_up_data: lead.btTopUpData || null,
+          property: lead.property || {},
+          verification_status: lead.verificationStatus || 'pending',
+          assessment_status: lead.assessmentStatus || 'pending',
+          kyc_status: lead.kycStatus || 'pending',
+          legal_status: lead.legalStatus || 'pending',
+          technical_status: lead.technicalStatus || 'pending',
+          admin_status: lead.adminStatus || 'pending',
+          legal_submitted: !!lead.legalSubmitted,
+          technical_submitted: !!lead.technicalSubmitted,
+          legal_submitted_date: lead.legalSubmittedDate || null,
+          technical_submitted_date: lead.technicalSubmittedDate || null,
+          stage: lead.stage || 'New',
+          created_at: lead.createdAt || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: lead.createdBy || 'system'
+        };
+      }
+
+      function rowToLead(row) {
+        return {
+          id: row.id,
+          borrower: row.borrower || {},
+          coApplicants: row.co_applicants || [],
+          references: row["references"] || [],
+          loanType: row.loan_type,
+          loanAmount: row.loan_amount,
+          credit: row.credit,
+          institutionType: row.institution_type,
+          institutionName: row.institution_name,
+          assignedBA: row.assigned_ba,
+          assignedLegal: row.assigned_legal,
+          assignedTechnical: row.assigned_technical,
+          btTopUpData: row.bt_top_up_data,
+          property: row.property || {},
+          verificationStatus: row.verification_status,
+          assessmentStatus: row.assessment_status,
+          kycStatus: row.kyc_status,
+          legalStatus: row.legal_status,
+          technicalStatus: row.technical_status,
+          adminStatus: row.admin_status,
+          legalSubmitted: !!row.legal_submitted,
+          technicalSubmitted: !!row.technical_submitted,
+          legalSubmittedDate: row.legal_submitted_date,
+          technicalSubmittedDate: row.technical_submitted_date,
+          stage: row.stage,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          createdBy: row.created_by
+        };
+      }
+
+      function usersToRows(usersObj) {
+        return Object.entries(usersObj).map(([email, u]) => ({
+          email,
+          password: u.password,
+          role: u.role,
+          name: u.name,
+          mobile: u.mobile || null,
+          status: u.status || 'active'
+        }));
+      }
+
+      function rowsToUsers(rows) {
+        const out = {};
+        rows.forEach(r => {
+          out[r.email] = { password: r.password, role: r.role, name: r.name, mobile: r.mobile, status: r.status };
+        });
+        return out;
+      }
+
+      let syncInFlight = false;
+      let syncQueued = false;
+
+      async function syncToSupabase() {
+        if (!sb) return;
+        if (syncInFlight) { syncQueued = true; return; }
+        syncInFlight = true;
+        setSyncStatus('⏳ Syncing to cloud…');
+        try {
+          const jobs = [];
+          jobs.push(sb.from('users').upsert(usersToRows(users), { onConflict: 'email' }));
+          if (leads.length) jobs.push(sb.from('leads').upsert(leads.map(leadToRow), { onConflict: 'id' }));
+          if (businessAssociates.length) jobs.push(sb.from('business_associates').upsert(businessAssociates, { onConflict: 'email' }));
+          if (legalTeam.length) jobs.push(sb.from('legal_team').upsert(legalTeam, { onConflict: 'email' }));
+          if (technicalTeam.length) jobs.push(sb.from('technical_team').upsert(technicalTeam, { onConflict: 'email' }));
+          const results = await Promise.all(jobs);
+          const firstError = results.map(r => r.error).find(Boolean);
+          if (firstError) throw firstError;
+          setSyncStatus('☁️ Synced to cloud · ' + new Date().toLocaleTimeString());
+        } catch (err) {
+          console.error('Supabase sync error:', err);
+          setSyncStatus('⚠️ Cloud sync failed — saved locally, will retry');
+        } finally {
+          syncInFlight = false;
+          if (syncQueued) { syncQueued = false; syncToSupabase(); }
+        }
+      }
+
+      async function syncFeedEntryToCloud(text) {
+        if (!sb) return;
+        try { await sb.from('feed_entries').insert({ text }); } catch (err) { console.error('feed sync error:', err); }
+      }
+
+      async function syncCibilScoreToCloud(score) {
+        if (!sb) return;
+        try { await sb.from('cibil_scores').insert({ score }); } catch (err) { console.error('cibil sync error:', err); }
+      }
+
+      async function loadFromSupabase() {
+        if (!sb) { setSyncStatus('⚡ Offline mode · data stored in browser (localStorage)'); return false; }
+        setSyncStatus('⏳ Connecting to cloud…');
+        try {
+          const [leadsRes, usersRes, baRes, legalRes, techRes, feedRes, cibilRes] = await Promise.all([
+            sb.from('leads').select('*').order('id', { ascending: true }),
+            sb.from('users').select('*'),
+            sb.from('business_associates').select('*').order('id', { ascending: true }),
+            sb.from('legal_team').select('*').order('id', { ascending: true }),
+            sb.from('technical_team').select('*').order('id', { ascending: true }),
+            sb.from('feed_entries').select('*').order('time', { ascending: false }).limit(50),
+            sb.from('cibil_scores').select('*').order('created_at', { ascending: false }).limit(1)
+          ]);
+          const firstError = [leadsRes, usersRes, baRes, legalRes, techRes].map(r => r.error).find(Boolean);
+          if (firstError) throw firstError;
+
+          const cloudIsEmpty = !usersRes.data || usersRes.data.length === 0;
+
+          if (usersRes.data && usersRes.data.length) users = rowsToUsers(usersRes.data);
+          if (baRes.data && baRes.data.length) businessAssociates = baRes.data;
+          if (legalRes.data && legalRes.data.length) legalTeam = legalRes.data;
+          if (techRes.data && techRes.data.length) technicalTeam = techRes.data;
+          if (leadsRes.data && leadsRes.data.length) {
+            leads = leadsRes.data.map(rowToLead);
+            nextId = Math.max(nextId, ...leads.map(l => l.id)) + 1;
+          }
+          if (feedRes.data && feedRes.data.length) {
+            feedEntries = feedRes.data.map(r => ({ time: new Date(r.time).toLocaleTimeString(), text: r.text }));
+          }
+          if (cibilRes.data && cibilRes.data.length) {
+            globalCibilScore = cibilRes.data[0].score;
+          }
+
+          saveToStorage(STORAGE_KEYS.leads, leads);
+          saveToStorage(STORAGE_KEYS.users, users);
+          saveToStorage(STORAGE_KEYS.businessAssociates, businessAssociates);
+          saveToStorage(STORAGE_KEYS.legalTeam, legalTeam);
+          saveToStorage(STORAGE_KEYS.technicalTeam, technicalTeam);
+          saveToStorage(STORAGE_KEYS.nextId, nextId);
+          saveToStorage(STORAGE_KEYS.feedEntries, feedEntries);
+          saveToStorage(STORAGE_KEYS.cibilScore, globalCibilScore);
+
+          // First-ever run: cloud tables are empty, push our local defaults up so every device starts in sync
+          if (cloudIsEmpty) { await syncToSupabase(); }
+
+          setSyncStatus('☁️ Synced to cloud · ' + new Date().toLocaleTimeString());
+          return true;
+        } catch (err) {
+          console.error('Supabase load error:', err);
+          setSyncStatus('⚠️ Cloud unreachable — using local data');
+          return false;
+        }
+      }
+
+      function subscribeToLeadChanges() {
+        if (!sb) return;
+        sb.channel('leads-live-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+            if (syncInFlight) return;
+            sb.from('leads').select('*').order('id', { ascending: true }).then(({ data, error }) => {
+              if (!error && data) {
+                leads = data.map(rowToLead);
+                nextId = Math.max(nextId, ...(leads.length ? leads.map(l => l.id) : [0])) + 1;
+                saveToStorage(STORAGE_KEYS.leads, leads);
+                if (typeof renderPipeline === 'function') renderPipeline();
+              }
+            });
+          })
+          .subscribe();
       }
 
       // ================================================================
@@ -3307,6 +3516,7 @@
         saveToStorage(STORAGE_KEYS.nextId, nextId);
         saveToStorage(STORAGE_KEYS.feedEntries, feedEntries);
         saveToStorage(STORAGE_KEYS.cibilScore, globalCibilScore);
+        syncToSupabase();
       }
 
       // ================================================================
@@ -3354,6 +3564,7 @@
         }
         globalCibilScore = score;
         saveToStorage(STORAGE_KEYS.cibilScore, globalCibilScore);
+        syncCibilScoreToCloud(globalCibilScore);
         updateCibilDisplay(globalCibilScore);
         const info = getCibilBand(score);
         const creditSelect = document.getElementById('leadCredit');
@@ -3431,6 +3642,7 @@
         feedEntries.unshift({ time: new Date().toLocaleTimeString(), text: msg });
         if (feedEntries.length > 50) feedEntries.pop();
         persistAll();
+        syncFeedEntryToCloud(msg);
         renderFeed();
       }
 
@@ -5596,6 +5808,7 @@
       // ================================================================
       // 26. INITIALIZATION
       // ================================================================
+      function finishInit() {
       updateBASelector();
       updateLegalSelector();
       updateTechnicalSelector();
@@ -5762,23 +5975,31 @@
         renderPipeline();
         document.getElementById('kycRequestBanner').style.display = 'block';
       }
+      } // end finishInit
 
-      console.log('✅ SOLITAIRE Underwriters Desk v2.1 loaded');
-      console.log('📋 Leads:', leads.length);
-      console.log('👤 Users:', Object.keys(users).length);
-      console.log('⚖️ Legal Team:', legalTeam.length);
-      console.log('🔧 Technical Team:', technicalTeam.length);
-      console.log('📊 CIBIL Score:', globalCibilScore);
-
-      window.__leads = leads;
-      window.__users = users;
-      window.__legalTeam = legalTeam;
-      window.__technicalTeam = technicalTeam;
-      window.__persistAll = persistAll;
       window.openBankTemplate = openBankTemplate;
       window.openLegalReport = openLegalReport;
       window.openTechnicalReport = openTechnicalReport;
       window.applyCibilScore = applyCibilScore;
+      window.__persistAll = persistAll;
+
+      setSyncStatus('⏳ Connecting to cloud…');
+      loadFromSupabase().finally(() => {
+        finishInit();
+        subscribeToLeadChanges();
+
+        console.log('✅ SOLITAIRE Underwriters Desk v2.1 loaded (Supabase-backed)');
+        console.log('📋 Leads:', leads.length);
+        console.log('👤 Users:', Object.keys(users).length);
+        console.log('⚖️ Legal Team:', legalTeam.length);
+        console.log('🔧 Technical Team:', technicalTeam.length);
+        console.log('📊 CIBIL Score:', globalCibilScore);
+
+        window.__leads = leads;
+        window.__users = users;
+        window.__legalTeam = legalTeam;
+        window.__technicalTeam = technicalTeam;
+      });
 
     })();
   </script>
