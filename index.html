@@ -3124,6 +3124,11 @@
         </div>
       </div>
 
+      <!-- REPORTS -->
+      <div id="screen-reports" class="screen">
+        <div id="reportsContent"><div style="text-align:center; color:#6a5f48; padding:30px;">Loading analytics…</div></div>
+      </div>
+
       <!-- SIMULATOR -->
       <div id="screen-simulator" class="screen">
         <div class="card">
@@ -3227,6 +3232,7 @@
     <div class="bottom-nav">
       <button class="nav-item active" data-screen="capture"><i class="fas fa-pen-fancy"></i><span>Capture</span></button>
       <button class="nav-item" data-screen="pipeline"><i class="fas fa-columns"></i><span>Pipeline</span></button>
+      <button class="nav-item" data-screen="reports"><i class="fas fa-chart-bar"></i><span>Reports</span></button>
       <button class="nav-item" data-screen="simulator"><i class="fas fa-cog"></i><span>Simulator</span></button>
     </div>
     <div class="deploy-note">⏳ Connecting to cloud…</div>
@@ -3473,6 +3479,87 @@
       }
 
       // ================================================================
+      // 1C. PASSWORD HASHING (PBKDF2 via Web Crypto — production hardening)
+      // ================================================================
+      function randomSaltHex() {
+        const arr = crypto.getRandomValues(new Uint8Array(16));
+        return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      async function pbkdf2Hex(password, saltHex) {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits(
+          { name: 'PBKDF2', salt: enc.encode(saltHex), iterations: 100000, hash: 'SHA-256' },
+          keyMaterial, 256
+        );
+        return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      // Stored format: "pbkdf2$<salt>$<hash>". Anything else is treated as legacy plaintext.
+      async function makePasswordRecord(plainPassword) {
+        const salt = randomSaltHex();
+        const hash = await pbkdf2Hex(plainPassword, salt);
+        return `pbkdf2$${salt}$${hash}`;
+      }
+
+      // Returns { ok: boolean, upgradedRecord: string|null } — upgradedRecord is set when a
+      // legacy plaintext password was correctly matched and should be re-saved as a hash.
+      async function verifyPasswordRecord(plainPassword, storedRecord) {
+        if (typeof storedRecord === 'string' && storedRecord.startsWith('pbkdf2$')) {
+          const parts = storedRecord.split('$');
+          const salt = parts[1], hash = parts[2];
+          const check = await pbkdf2Hex(plainPassword, salt);
+          return { ok: check === hash, upgradedRecord: null };
+        }
+        // Legacy plaintext record
+        const ok = storedRecord === plainPassword;
+        return { ok, upgradedRecord: ok ? await makePasswordRecord(plainPassword) : null };
+      }
+
+      // ================================================================
+      // 1D. DOCUMENT STORAGE (Supabase Storage — private bucket)
+      // ================================================================
+      const DOC_BUCKET = 'lead-documents';
+      const DOC_TYPES = ['Aadhaar', 'PAN', 'Property Card', 'Mutation Entry', 'Bank Statement',
+        'Salary Slip / ITR', 'Valuation Report', 'Sale Deed', 'NOC', 'Photograph', 'Other'];
+
+      function sanitizeFileName(name) {
+        return name.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-80);
+      }
+
+      async function uploadLeadDocument(lead, file, docType) {
+        if (!sb) { alert('Cloud storage is unavailable right now.'); return; }
+        const path = `leads/${lead.id}/${docType.replace(/\s+/g, '_')}__${Date.now()}_${sanitizeFileName(file.name)}`;
+        const { error: upErr } = await sb.storage.from(DOC_BUCKET).upload(path, file, { upsert: false });
+        if (upErr) { alert('Upload failed: ' + upErr.message); return; }
+        await sb.from('doc_history').insert({
+          type: docType, lead_name: lead.borrower?.name || '', lead_id: lead.id,
+          file_path: path, uploaded_by: currentUserData?.name || currentUser || 'unknown'
+        });
+        addFeed(`📎 ${docType} uploaded for ${lead.borrower?.name || 'lead #' + lead.id}`);
+      }
+
+      async function listLeadDocuments(lead) {
+        if (!sb) return [];
+        const { data, error } = await sb.storage.from(DOC_BUCKET).list(`leads/${lead.id}`, { sortBy: { column: 'created_at', order: 'desc' } });
+        if (error || !data) return [];
+        return data.filter(f => f.name);
+      }
+
+      async function getLeadDocumentUrl(lead, fileName) {
+        if (!sb) return null;
+        const { data, error } = await sb.storage.from(DOC_BUCKET)
+          .createSignedUrl(`leads/${lead.id}/${fileName}`, 3600);
+        return error ? null : data.signedUrl;
+      }
+
+      async function deleteLeadDocument(lead, fileName) {
+        if (!sb) return;
+        await sb.storage.from(DOC_BUCKET).remove([`leads/${lead.id}/${fileName}`]);
+      }
+
+      // ================================================================
       // 2. INITIALIZE DATA
       // ================================================================
       let leads = loadFromStorage(STORAGE_KEYS.leads, []);
@@ -3638,6 +3725,133 @@
         return member ? member.name : email.split('@')[0];
       }
 
+      // ================================================================
+      // REPORTS / ANALYTICS
+      // ================================================================
+      function fmtCr(amount) {
+        if (!amount) return '₹0';
+        if (amount >= 10000000) return '₹' + (amount / 10000000).toFixed(2) + 'Cr';
+        return '₹' + (amount / 100000).toFixed(1) + 'L';
+      }
+
+      function barRow(label, count, max, extra) {
+        const pct = max > 0 ? Math.max(4, Math.round((count / max) * 100)) : 0;
+        return `<div style="margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:#c9b98a; margin-bottom:2px;">
+            <span>${escapeHtml(label)}</span><span>${count}${extra ? ' · ' + extra : ''}</span>
+          </div>
+          <div style="background:#161622; border-radius:6px; height:8px; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#c9a84c,#f0d78a);"></div>
+          </div>
+        </div>`;
+      }
+
+      function statCard(label, value) {
+        return `<div style="flex:1; min-width:100px; background:#12121c; border:1px solid rgba(255,215,0,0.08); border-radius:10px; padding:10px; text-align:center;">
+          <div style="font-size:18px; font-weight:700; color:#f0e6d0;">${value}</div>
+          <div style="font-size:10px; color:#8a7f66; margin-top:2px; letter-spacing:0.3px;">${escapeHtml(label)}</div>
+        </div>`;
+      }
+
+      function renderReports() {
+        const container = document.getElementById('reportsContent');
+        if (!container) return;
+
+        let scopedLeads = leads;
+        let scopeLabel = 'All Leads';
+        if (currentRole === 'business') { scopedLeads = leads.filter(l => l.assignedBA === currentUser); scopeLabel = 'Your Leads'; }
+        else if (currentRole === 'legal') { scopedLeads = leads.filter(l => l.assignedLegal === currentUser); scopeLabel = 'Assigned to You'; }
+        else if (currentRole === 'technical') { scopedLeads = leads.filter(l => l.assignedTechnical === currentUser); scopeLabel = 'Assigned to You'; }
+
+        const total = scopedLeads.length;
+        const totalAmount = scopedLeads.reduce((s, l) => s + (l.loanAmount || 0), 0);
+        const approved = scopedLeads.filter(l => l.stage === 'Approved').length;
+        const declined = scopedLeads.filter(l => (l.stage || '').includes('Declined')).length;
+        const inProgress = total - approved - declined;
+        const conversionRate = total > 0 ? ((approved / total) * 100).toFixed(1) : '0.0';
+        const avgTicket = total > 0 ? totalAmount / total : 0;
+
+        const stageOrder = ['New', 'Legal Submitted', 'Technical Submitted', 'Legal Approved', 'Technical Approved',
+          'Ready for Admin Approval', 'Approved', 'Legal Declined', 'Technical Declined', 'Declined'];
+        const byStage = {};
+        scopedLeads.forEach(l => { const s = l.stage || 'New'; byStage[s] = (byStage[s] || 0) + 1; });
+        const maxStage = Math.max(1, ...Object.values(byStage));
+
+        const byLoanType = {};
+        scopedLeads.forEach(l => { const t = l.loanType || 'Other'; byLoanType[t] = (byLoanType[t] || 0) + 1; });
+        const maxLoanType = Math.max(1, ...Object.values(byLoanType));
+
+        let html = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-weight:600; color:#f0e6d0;">📊 ${escapeHtml(scopeLabel)} Analytics</span>
+            <button class="btn-secondary btn-sm" id="refreshReportsBtn">🔄 Refresh</button>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+            ${statCard('Total Leads', total)}
+            ${statCard('Approved', approved)}
+            ${statCard('Declined', declined)}
+            ${statCard('In Progress', inProgress)}
+            ${statCard('Conversion', conversionRate + '%')}
+            ${statCard('Avg Ticket', fmtCr(avgTicket))}
+          </div>
+          <div class="card" style="margin-bottom:12px;">
+            <div class="card-title"><i class="fas fa-layer-group"></i> Pipeline by Stage</div>
+            ${stageOrder.filter(s => byStage[s]).map(s => barRow(s, byStage[s], maxStage)).join('') || '<div style="color:#6a5f48; font-size:12px;">No leads yet.</div>'}
+          </div>
+          <div class="card" style="margin-bottom:12px;">
+            <div class="card-title"><i class="fas fa-tags"></i> By Loan Type</div>
+            ${Object.entries(byLoanType).sort((a, b) => b[1] - a[1]).map(([t, c]) => barRow(t, c, maxLoanType)).join('') || '<div style="color:#6a5f48; font-size:12px;">No leads yet.</div>'}
+          </div>
+          <div class="card" style="margin-bottom:6px;">
+            <div class="card-title"><i class="fas fa-rupee-sign"></i> Total Pipeline Value</div>
+            <div style="font-size:20px; font-weight:700; color:#c9a84c; text-align:center; padding:6px 0;">${fmtCr(totalAmount)}</div>
+          </div>
+        `;
+
+        if (currentRole === 'owner') {
+          const maxBA = Math.max(1, ...businessAssociates.map(ba => leads.filter(l => l.assignedBA === ba.email).length), 1);
+          const baRows = businessAssociates.map(ba => {
+            const baLeads = leads.filter(l => l.assignedBA === ba.email);
+            const baApproved = baLeads.filter(l => l.stage === 'Approved').length;
+            return barRow(ba.name, baLeads.length, maxBA, `${baApproved} approved · ${fmtCr(baLeads.reduce((s, l) => s + (l.loanAmount || 0), 0))}`);
+          }).join('') || '<div style="color:#6a5f48; font-size:12px;">No business associates yet.</div>';
+
+          const legalRows = legalTeam.map(m => {
+            const mLeads = leads.filter(l => l.assignedLegal === m.email);
+            const a = mLeads.filter(l => l.legalStatus === 'approved').length;
+            const d = mLeads.filter(l => l.legalStatus === 'declined').length;
+            const p = mLeads.length - a - d;
+            return `<div style="display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span>⚖️ ${escapeHtml(m.name)}</span><span style="color:#8a7f66;">${a} ✅ &nbsp; ${d} ❌ &nbsp; ${p} ⏳</span></div>`;
+          }).join('') || '<div style="color:#6a5f48; font-size:12px;">No legal team members yet.</div>';
+
+          const techRows = technicalTeam.map(m => {
+            const mLeads = leads.filter(l => l.assignedTechnical === m.email);
+            const a = mLeads.filter(l => l.technicalStatus === 'approved').length;
+            const d = mLeads.filter(l => l.technicalStatus === 'declined').length;
+            const p = mLeads.length - a - d;
+            return `<div style="display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span>🔧 ${escapeHtml(m.name)}</span><span style="color:#8a7f66;">${a} ✅ &nbsp; ${d} ❌ &nbsp; ${p} ⏳</span></div>`;
+          }).join('') || '<div style="color:#6a5f48; font-size:12px;">No technical team members yet.</div>';
+
+          html += `
+            <div class="card" style="margin-bottom:12px;">
+              <div class="card-title"><i class="fas fa-user-tie"></i> Business Associate Performance</div>
+              ${baRows}
+            </div>
+            <div class="card" style="margin-bottom:12px;">
+              <div class="card-title"><i class="fas fa-balance-scale"></i> Legal Team Performance</div>
+              ${legalRows}
+            </div>
+            <div class="card" style="margin-bottom:6px;">
+              <div class="card-title"><i class="fas fa-hard-hat"></i> Technical Team Performance</div>
+              ${techRows}
+            </div>
+          `;
+        }
+
+        container.innerHTML = html;
+        document.getElementById('refreshReportsBtn')?.addEventListener('click', renderReports);
+      }
+
       function addFeed(msg) {
         feedEntries.unshift({ time: new Date().toLocaleTimeString(), text: msg });
         if (feedEntries.length > 50) feedEntries.pop();
@@ -3753,7 +3967,7 @@
       });
       cancelResetBtn.addEventListener('click', function() { resetPasswordBox.classList.remove('show'); });
 
-      resetPasswordBtn.addEventListener('click', function() {
+      resetPasswordBtn.addEventListener('click', async function() {
         const identifier = resetEmail.value.trim();
         const newPass = resetNewPassword.value.trim();
         const confirmPass = resetConfirmPassword.value.trim();
@@ -3767,7 +3981,7 @@
             foundKey = key; break; }
         }
         if (!foundUser) { loginError.textContent = '⚠️ No account found with this email or mobile number.'; return; }
-        users[foundKey].password = newPass;
+        users[foundKey].password = await makePasswordRecord(newPass);
         persistAll();
         loginError.textContent = '✅ Password reset successfully! Please sign in.';
         resetPasswordBox.classList.remove('show');
@@ -3776,7 +3990,7 @@
         document.querySelector('#authToggle button[data-mode="signin"]').click();
       });
 
-      signupBtn.addEventListener('click', function() {
+      signupBtn.addEventListener('click', async function() {
         const name = signupName.value.trim();
         const email = signupEmail.value.trim().toLowerCase();
         const mobile = signupMobile.value.trim();
@@ -3791,7 +4005,8 @@
         else if (role === 'legal') userRole = 'legal';
         else if (role === 'technical') userRole = 'technical';
         else userRole = 'customer';
-        users[email] = { password, role: userRole, name, mobile, status: 'pending' };
+        const passwordRecord = await makePasswordRecord(password);
+        users[email] = { password: passwordRecord, role: userRole, name, mobile, status: 'pending' };
         if (role === 'business') {
           if (!businessAssociates.find(b => b.email === email)) {
             businessAssociates.push({ id: businessAssociates.reduce((max, b) => Math.max(max, b.id), 0) + 1, name,
@@ -3818,7 +4033,7 @@
         updateTechnicalSelector();
       });
 
-      function login(identifier, password) {
+      async function login(identifier, password) {
         let foundUser = null,
           foundKey = null;
         for (const [key, user] of Object.entries(users)) {
@@ -3829,9 +4044,15 @@
           loginError.textContent = '❌ No account found with this email or mobile number.';
           return false;
         }
-        if (foundUser.password !== password) {
+        const check = await verifyPasswordRecord(password, foundUser.password);
+        if (!check.ok) {
           loginError.textContent = '❌ Incorrect password. Please try again.';
           return false;
+        }
+        if (check.upgradedRecord) {
+          // Transparently upgrade legacy plaintext password to a hashed record
+          users[foundKey].password = check.upgradedRecord;
+          persistAll();
         }
         if ((foundUser.role === 'legal' || foundUser.role === 'technical') && foundUser.status === 'pending') {
           loginError.textContent = '⏳ Your account is pending admin approval.';
@@ -3867,14 +4088,16 @@
         return true;
       }
 
-      loginBtn.addEventListener('click', function() {
+      loginBtn.addEventListener('click', async function() {
         const identifier = loginEmail.value.trim();
         const password = loginPassword.value.trim();
         if (!identifier || !password) {
           loginError.textContent = '⚠️ Please enter both email/mobile and password.';
           return;
         }
-        login(identifier, password);
+        loginBtn.disabled = true;
+        await login(identifier, password);
+        loginBtn.disabled = false;
       });
       loginPassword.addEventListener('keydown', function(e) { if (e.key === 'Enter') loginBtn.click(); });
 
@@ -3934,6 +4157,12 @@
           else simTab.classList.remove('hidden-tab'); }
       }
 
+      function hideReportsTab(hide) {
+        const repTab = document.querySelector('.nav-item[data-screen="reports"]');
+        if (repTab) { if (hide) repTab.classList.add('hidden-tab');
+          else repTab.classList.remove('hidden-tab'); }
+      }
+
       function updateAutoAssignBA() {
         const assignSelect = document.getElementById('assignBA');
         const displayDiv = document.getElementById('assignedBADisplay');
@@ -3973,6 +4202,7 @@
           userNameDisplay.textContent = 'Guest';
           roleIndicator.textContent = '';
           hideSimulatorTab(true);
+          hideReportsTab(true);
           document.getElementById('teamAssignmentSection').style.display = 'none';
           return;
         }
@@ -4004,6 +4234,7 @@
         captureCard.style.opacity = '1';
         captureCard.style.pointerEvents = 'auto';
         hideSimulatorTab(false);
+        hideReportsTab(false);
 
         if (isCustomer) {
           captureCard.style.opacity = '0.7';
@@ -4011,6 +4242,7 @@
           if (saveBtn) saveBtn.disabled = true;
           if (feedback) feedback.innerHTML = '<span style="color:#c48ad6;">👤 Customer View - Your profile is shown below</span>';
           hideSimulatorTab(true);
+          hideReportsTab(true);
           document.querySelectorAll('#screen-capture .btn-primary, #screen-capture .btn-success').forEach(btn => {
             btn.style.display = 'none';
           });
@@ -5039,6 +5271,17 @@
             ${currentRole === 'legal' ? `<button class="btn-secondary btn-sm" id="legalReportFromDetail">📋 Legal Report</button>` : ''}
             ${currentRole === 'technical' ? `<button class="btn-secondary btn-sm" id="technicalReportFromDetail">📋 Tech Report</button>` : ''}
           </div>
+          <div style="margin-top:14px; border-top:1px solid rgba(255,215,0,0.1); padding-top:10px;">
+            <div style="color:#c9a84c; font-weight:500; font-size:12px; margin-bottom:6px;">📎 Documents</div>
+            <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+              <select id="docTypeSelect" style="flex:1; min-width:120px; background:#0f0f18; color:#eee; border:1px solid rgba(255,215,0,0.15); border-radius:6px; padding:6px;">
+                ${DOC_TYPES.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('')}
+              </select>
+              <input type="file" id="docFileInput" style="flex:1; min-width:140px; font-size:11px; color:#ccc;" />
+              <button class="btn-primary btn-sm" id="docUploadBtn">⬆️ Upload</button>
+            </div>
+            <div id="leadDocsList" style="font-size:12px; color:#999;">Loading documents…</div>
+          </div>
         `;
 
         document.getElementById('refreshDetailBtn')?.addEventListener('click', function() { location.reload(); });
@@ -5049,6 +5292,53 @@
           lead); });
         document.getElementById('technicalReportFromDetail')?.addEventListener('click', function() {
           openTechnicalReport(lead); });
+
+        document.getElementById('docUploadBtn')?.addEventListener('click', async function() {
+          const fileInput = document.getElementById('docFileInput');
+          const docType = document.getElementById('docTypeSelect').value;
+          const file = fileInput.files[0];
+          if (!file) { alert('Choose a file first.'); return; }
+          this.disabled = true;
+          this.textContent = '⏳ Uploading…';
+          await uploadLeadDocument(lead, file, docType);
+          this.disabled = false;
+          this.textContent = '⬆️ Upload';
+          fileInput.value = '';
+          renderLeadDocuments(lead);
+        });
+        renderLeadDocuments(lead);
+      }
+
+      async function renderLeadDocuments(lead) {
+        const listEl = document.getElementById('leadDocsList');
+        if (!listEl) return;
+        const files = await listLeadDocuments(lead);
+        if (!files.length) { listEl.innerHTML = 'No documents uploaded yet.'; return; }
+        listEl.innerHTML = files.map(f => {
+          const label = f.name.includes('__') ? f.name.split('__')[0].replace(/_/g, ' ') : f.name;
+          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <span>📄 ${escapeHtml(label)}</span>
+            <span style="display:flex; gap:8px;">
+              <a href="#" class="doc-view-link" data-file="${escapeHtml(f.name)}" style="color:#6a9ad4;">View</a>
+              <a href="#" class="doc-delete-link" data-file="${escapeHtml(f.name)}" style="color:#d46a6a;">Delete</a>
+            </span>
+          </div>`;
+        }).join('');
+        listEl.querySelectorAll('.doc-view-link').forEach(a => {
+          a.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const url = await getLeadDocumentUrl(lead, this.dataset.file);
+            if (url) window.open(url, '_blank'); else alert('Could not open file.');
+          });
+        });
+        listEl.querySelectorAll('.doc-delete-link').forEach(a => {
+          a.addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (!confirm('Delete this document?')) return;
+            await deleteLeadDocument(lead, this.dataset.file);
+            renderLeadDocuments(lead);
+          });
+        });
       }
 
       function editLead(lead) {
@@ -5802,6 +6092,7 @@
           document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
           const target = document.getElementById('screen-' + screen);
           if (target) target.classList.add('active');
+          if (screen === 'reports') renderReports();
         });
       });
 
