@@ -3267,7 +3267,39 @@
       }
 
       function saveToStorage(key, data) {
-        localStorage.setItem(key, JSON.stringify(data));
+        let safeData = data;
+        if (key === STORAGE_KEYS.users && data && typeof data === 'object') {
+          safeData = {};
+          const SENSITIVE_USER_FIELDS = new Set([
+            'password',
+            'passwordHash',
+            'passwordRecord',
+            'resetToken',
+            'resetCode',
+            'otp',
+            'verificationCode',
+            'recoveryCode',
+            'recoveryCodes',
+            'auth',
+            'session',
+            'accessToken',
+            'refreshToken'
+          ]);
+          for (const [userKey, userVal] of Object.entries(data)) {
+            if (userVal && typeof userVal === 'object') {
+              const sanitizedUser = {};
+              for (const [fieldKey, fieldVal] of Object.entries(userVal)) {
+                if (!SENSITIVE_USER_FIELDS.has(fieldKey)) {
+                  sanitizedUser[fieldKey] = fieldVal;
+                }
+              }
+              safeData[userKey] = sanitizedUser;
+            } else {
+              safeData[userKey] = userVal;
+            }
+          }
+        }
+        localStorage.setItem(key, JSON.stringify(safeData));
       }
 
       // ================================================================
