@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Technical Evaluation Report | Solitaire Finz Mart</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -938,11 +939,12 @@
         <nav style="display:flex;gap:6px;overflow-x:auto;padding-top:10px;">
             <a href="index.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Home</a>
             <a href="technical.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--gold);background:var(--panel);font-size:11.5px;color:var(--gold);text-decoration:none;white-space:nowrap;">Technical Evaluation</a>
-            <a href="legal.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Legal</a>
+            <a href="legal.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Legal Evaluation</a>
+            <a href="privacy.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Privacy</a>
         </nav>
         <div class="meta-row">
             <span class="badge badge-draft" id="statusBadge">Draft</span>
-            <span class="app-no" id="appNoLabel">LN-2026-00842</span>
+            <span class="app-no" id="appNoLabel" title="Click to load a different report" style="cursor:pointer; text-decoration:underline dotted;">LN-2026-00842</span>
         </div>
         <div class="progress-wrap">
             <div class="progress-track">
@@ -993,6 +995,96 @@
             valuerName: 'A. D. Kulkarni',
             valuerId: 'STFM-VAL-0117'
         };
+
+        // -------------------------------------------------------------
+        // SUPABASE CLOUD SYNC
+        // -------------------------------------------------------------
+        const SUPABASE_URL = "https://nbpvamrwzqrgoiwpadwc.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_GrJ_9z_y903WFMGjoAg82Q_cG3N2_Jx";
+        const sb = (window.supabase && window.supabase.createClient)
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+            : null;
+        const REPORT_TYPE = 'technical';
+        const MEDIA_BUCKET = 'evaluation-media';
+
+        async function uploadDataUrlToStorage(dataUrl, path, contentType) {
+            try {
+                const res = await fetch(dataUrl);
+                const blob = await res.blob();
+                const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, blob, { upsert: true, contentType });
+                return !error;
+            } catch (err) { console.error('upload error:', err); return false; }
+        }
+
+        async function loadReportFromCloud(appNo) {
+            if (!sb || !appNo) return false;
+            toast('Loading report ' + appNo + '…');
+            const { data, error } = await sb.from('evaluation_reports').select('*')
+                .eq('report_type', REPORT_TYPE).eq('loan_app_no', appNo).maybeSingle();
+            if (error || !data) { toast('No saved report found for ' + appNo + ' — starting new draft'); return false; }
+            state.status = data.status || 'draft';
+            state.data = data.data || {};
+            state.gps = data.gps || null;
+            state.photos = {};
+            const photoPaths = state.data.__photoPaths || {};
+            for (const slot in photoPaths) {
+                const { data: signed } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(photoPaths[slot], 3600);
+                if (signed) state.photos[slot] = signed.signedUrl;
+            }
+            if (data.signature_path) {
+                const { data: signed } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(data.signature_path, 3600);
+                if (signed) state.signature = signed.signedUrl;
+            }
+            toast('Report loaded from cloud');
+            renderAll();
+            return true;
+        }
+
+        async function syncReportToCloud(showToast) {
+            if (!sb) { if (showToast) toast('Cloud unavailable — not saved'); return false; }
+            const appNo = (state.data.loanAppNo || '').trim();
+            if (!appNo) { toast('Enter a Loan Application Number before saving'); return false; }
+            const savedEl = document.getElementById('autosaveTxt');
+            if (savedEl) savedEl.textContent = '⏳ Saving to cloud…';
+
+            const photoPaths = state.data.__photoPaths || {};
+            for (const slot in state.photos) {
+                const src = state.photos[slot];
+                if (src && src.startsWith('data:')) {
+                    const path = `technical/${appNo}/photo_${slot}_${Date.now()}.jpg`;
+                    const ok = await uploadDataUrlToStorage(src, path, 'image/jpeg');
+                    if (ok) photoPaths[slot] = path;
+                }
+            }
+            state.data.__photoPaths = photoPaths;
+
+            let signaturePath = state.data.__signaturePath || null;
+            if (state.signature && state.signature.startsWith('data:')) {
+                signaturePath = `technical/${appNo}/signature_${Date.now()}.png`;
+                await uploadDataUrlToStorage(state.signature, signaturePath, 'image/png');
+                state.data.__signaturePath = signaturePath;
+            }
+
+            const { error } = await sb.from('evaluation_reports').upsert({
+                report_type: REPORT_TYPE,
+                loan_app_no: appNo,
+                status: state.status,
+                data: state.data,
+                gps: state.gps,
+                signature_path: signaturePath,
+                updated_by: state.role,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'report_type,loan_app_no' });
+
+            if (error) {
+                console.error('Supabase save error:', error);
+                if (savedEl) savedEl.textContent = '⚠️ Cloud save failed';
+                if (showToast) toast('Save failed: ' + error.message);
+                return false;
+            }
+            if (savedEl) savedEl.textContent = '☁️ Saved · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return true;
+        }
 
         // -------------------------------------------------------------
         // SCHEMA
@@ -1171,15 +1263,26 @@
         // -------------------------------------------------------------
         // INIT
         // -------------------------------------------------------------
-        // Prefill
-        schema.forEach(sec => {
-            (sec.fields || []).forEach(f => {
-                if (f.prefill && dummyLead[f.key]) state.data[f.key] = dummyLead[f.key];
+        async function initReport() {
+            const params = new URLSearchParams(location.search);
+            const appParam = params.get('app');
+            let loaded = false;
+            if (appParam) {
+                loaded = await loadReportFromCloud(appParam.trim());
+            }
+            if (!loaded) {
+                schema.forEach(sec => {
+                    (sec.fields || []).forEach(f => {
+                        if (f.prefill && dummyLead[f.key] && !state.data[f.key]) state.data[f.key] = dummyLead[f.key];
+                    });
+                });
+                if (appParam) state.data.loanAppNo = appParam.trim();
+            }
+            schema.find(s => s.id === 'sec3').items.forEach((label, i) => {
+                if (!state.data['verify_' + i]) state.data['verify_' + i] = { status: 'pending', remarks: '' };
             });
-        });
-        schema.find(s => s.id === 'sec3').items.forEach((label, i) => {
-            state.data['verify_' + i] = { status: 'pending', remarks: '' };
-        });
+            renderAll();
+        }
 
         // -------------------------------------------------------------
         // HELPERS
@@ -1621,13 +1724,12 @@
         // -------------------------------------------------------------
         // ACTIONS
         // -------------------------------------------------------------
-        function saveDraft() {
-            document.getElementById('autosaveTxt').textContent = 'Draft saved · ' + new Date().toLocaleTimeString([], { hour: '2-digit',
-                minute: '2-digit' });
-            toast('Saved as draft');
+        async function saveDraft() {
+            const ok = await syncReportToCloud(true);
+            toast(ok ? 'Saved as draft' : 'Save failed — check connection');
         }
 
-        function submitReport() {
+        async function submitReport() {
             submitAttempted = true;
             const missing = getMissingRequired();
             if (missing.length) {
@@ -1637,19 +1739,23 @@
                 return;
             }
             state.status = 'submitted';
-            toast('Report submitted for review');
+            const ok = await syncReportToCloud(false);
+            toast(ok ? 'Report submitted for review' : 'Submitted locally — cloud save failed');
             renderAll();
         }
 
-        function approveReport() { state.status = 'approved';
+        async function approveReport() { state.status = 'approved';
+            await syncReportToCloud(false);
             toast('Report approved');
             renderAll(); }
 
-        function rejectReport() { state.status = 'rejected';
+        async function rejectReport() { state.status = 'rejected';
+            await syncReportToCloud(false);
             toast('Report rejected — sent back to associate');
             renderAll(); }
 
-        function reopenDraft() { state.status = 'draft';
+        async function reopenDraft() { state.status = 'draft';
+            await syncReportToCloud(false);
             renderAll(); }
 
         function exportPDF() {
@@ -1691,7 +1797,16 @@
             renderAll();
         };
 
-        renderAll();
+        document.getElementById('appNoLabel').onclick = async () => {
+            const appNo = prompt('Enter Loan Application Number to load:', state.data.loanAppNo || '');
+            if (appNo && appNo.trim()) {
+                const loaded = await loadReportFromCloud(appNo.trim());
+                if (!loaded) { state.data.loanAppNo = appNo.trim();
+                    renderAll(); }
+            }
+        };
+
+        initReport();
     </script>
 </body>
 </html>
