@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Legal | Privacy Policy &amp; Terms | Solitaire Finz Mart</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+        :root {
+            --bg: #0A0D12;
+            --panel: #12161D;
+            --panel-2: #171C25;
+            --border: rgba(196, 166, 114, 0.22);
+            --border-soft: rgba(196, 166, 114, 0.12);
+            --gold: #C4A672;
+            --gold-bright: #E1C892;
+            --ink: #ECE8E0;
+            --ink-dim: #9BA3AE;
+            --ink-faint: #6B7280;
+            --navy: #141A26;
+            --radius: 10px;
+            --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+        }
+
+        [data-theme="light"] {
+            --bg: #F3EFE7;
+            --panel: #FFFFFF;
+            --panel-2: #FAF7F0;
+            --border: rgba(30, 32, 26, 0.14);
+            --border-soft: rgba(30, 32, 26, 0.08);
+            --ink: #1B1D22;
+            --ink-dim: #565B63;
+            --ink-faint: #8A8F98;
+            --navy: #EFEAE0;
+            --shadow: 0 8px 24px rgba(30, 25, 15, 0.10);
+        }
+
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Inter', sans-serif;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .serif { font-family: 'Cormorant Garamond', serif; }
+        .mono { font-family: 'IBM Plex Mono', monospace; }
+        a { color: inherit; }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: linear-gradient(180deg, var(--navy) 0%, var(--bg) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 16px;
+        }
+        .topbar-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            max-width: 820px;
+            margin: 0 auto;
+        }
+        .brandmark { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .crest {
+            width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%;
+            background: radial-gradient(circle at 32% 28%, var(--gold-bright), var(--gold) 55%, #7c6640 100%);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 0 1px var(--border), inset 0 0 6px rgba(0,0,0,.35);
+        }
+        .crest span { font-family: 'Cormorant Garamond', serif; font-weight: 700; color: #0A0D12; font-size: 15px; }
+        .brand-text .name { font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: 17px; letter-spacing: .3px; line-height: 1.1; white-space: nowrap; }
+        .brand-text .sub { font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--gold); opacity: .9; }
+        .icon-btn {
+            width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--panel); color: var(--ink); display: flex; align-items: center;
+            justify-content: center; cursor: pointer; font-size: 15px;
+        }
+
+        /* nav rail linking all three pages */
+        .rail {
+            display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px;
+            max-width: 820px; margin: 0 auto; background: var(--bg);
+            border-bottom: 1px solid var(--border-soft); scrollbar-width: none;
+        }
+        .rail::-webkit-scrollbar { display: none; }
+        .rail-item {
+            flex: 0 0 auto; padding: 6px 13px; border-radius: 100px; border: 1px solid var(--border);
+            background: var(--panel); font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
+            white-space: nowrap;
+        }
+        .rail-item.active { border-color: var(--gold); color: var(--gold); }
+
+        .wrap { max-width: 820px; margin: 0 auto; padding: 20px 16px 100px 16px; }
+
+        .hero { margin-bottom: 22px; }
+        .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700; margin: 0 0 6px 0; }
+        .hero .updated { font-size: 11.5px; color: var(--ink-faint); }
+        .mono.updated { font-family: 'IBM Plex Mono', monospace; }
+
+        .toc {
+            background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 14px 16px; margin-bottom: 20px;
+        }
+        .toc-title { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+        .toc a { display: block; font-size: 13px; color: var(--ink-dim); padding: 4px 0; text-decoration: none; }
+        .toc a:hover { color: var(--gold); }
+
+        .section {
+            background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 18px 16px; margin-bottom: 12px; scroll-margin-top: 110px;
+        }
+        .section h2 {
+            font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 700;
+            color: var(--gold-bright); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;
+        }
+        .section h2 .idx { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--gold); }
+        .section p, .section li { font-size: 13.5px; line-height: 1.65; color: var(--ink); margin: 0 0 10px 0; }
+        .section ul { margin: 0 0 10px 0; padding-left: 20px; }
+        .section strong { color: var(--gold-bright); font-weight: 600; }
+        .divider { border: none; border-top: 1px solid var(--border-soft); margin: 24px 0; }
+
+        .contact-box {
+            background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 16px; font-size: 13px; line-height: 1.7;
+        }
+        .contact-box .label { color: var(--ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; }
+
+        footer.site-footer {
+            max-width: 820px; margin: 0 auto; padding: 20px 16px 40px 16px;
+            font-size: 11px; color: var(--ink-faint); text-align: center;
+        }
+
+        @media (min-width: 720px) {
+            .hero h1 { font-size: 36px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <div class="topbar-row">
+            <div class="brandmark">
+                <div class="crest"><span>S</span></div>
+                <div class="brand-text">
+                    <div class="name">Solitaire Finz Mart</div>
+                    <div class="sub">Legal &amp; Compliance</div>
+                </div>
+            </div>
+            <button class="icon-btn" id="themeToggle" title="Toggle theme" onclick="document.documentElement.toggleAttribute('data-theme')">&#9788;</button>
+        </div>
+    </header>
+
+    <nav class="rail">
+        <a class="rail-item" href="index.html">Home</a>
+        <a class="rail-item" href="technical.html">Technical Evaluation</a>
+        <a class="rail-item" href="legal.html">Legal Evaluation</a>
+        <a class="rail-item active" href="privacy.html">Privacy Policy</a>
+    </nav>
+
+    <div class="wrap">
+        <div class="hero">
+            <h1 class="serif">Privacy Policy &amp; Terms of Service</h1>
+            <div class="updated mono">Last updated: 1 August 2026 &nbsp;·&nbsp; Applies to Solitaire Finz Mart, Bhiwandi, Maharashtra</div>
+        </div>
+
+        <div class="toc">
+            <div class="toc-title">On this page</div>
+            <a href="#privacy">1. Privacy Policy</a>
+            <a href="#terms">2. Terms &amp; Conditions</a>
+            <a href="#data">3. Data Storage &amp; Processing (Supabase)</a>
+            <a href="#rights">4. Your Rights</a>
+            <a href="#contact">5. Contact</a>
+        </div>
+
+        <section class="section" id="privacy">
+            <h2><span class="idx">01</span> Privacy Policy</h2>
+            <p>Solitaire Finz Mart ("we", "us", "our") operates as a Direct Selling Agent (DSA) and loan advisory
+            business in Bhiwandi, Maharashtra, facilitating loan and financial products on behalf of partner banks
+            and NBFCs. This Privacy Policy explains how we collect, use, store, and protect personal and financial
+            information submitted through our website, lead management platform, and related tools.</p>
+            <p><strong>Information we collect</strong> may include: name, contact details, address, PAN/Aadhaar
+            details (where required for KYC), income and employment information, property details, loan requirement
+            details, CIBIL score and credit history references, and documents uploaded for underwriting purposes.</p>
+            <p><strong>How we use it:</strong> to assess loan eligibility, match applicants with suitable lenders
+            (banks/NBFCs), process applications, communicate status updates, and comply with regulatory
+            requirements. We do not sell personal data to third parties. Data is shared only with the specific
+            bank/NBFC selected for an application, and only to the extent required to process that application.</p>
+        </section>
+
+        <section class="section" id="terms">
+            <h2><span class="idx">02</span> Terms &amp; Conditions</h2>
+            <p>By using this website or submitting an enquiry, you agree to the following terms:</p>
+            <ul>
+                <li>Solitaire Finz Mart acts as an intermediary/DSA and does not itself sanction or disburse loans.
+                Final approval, interest rates, and terms are determined solely by the partner bank/NBFC.</li>
+                <li>Submission of an enquiry or application does not guarantee loan approval.</li>
+                <li>You confirm that all information and documents provided are true, accurate, and belong to you
+                or an applicant you are authorised to represent.</li>
+                <li>Processing fees, if any, are charged by the respective bank/NBFC as per their policy and are
+                separately communicated; Solitaire Finz Mart's advisory role does not itself levy hidden charges.</li>
+                <li>We reserve the right to decline to process an enquiry that appears fraudulent, incomplete, or
+                non-compliant with applicable regulations.</li>
+            </ul>
+        </section>
+
+        <section class="section" id="data">
+            <h2><span class="idx">03</span> Data Storage &amp; Processing</h2>
+            <p>Lead, application, and workflow data submitted through our platform is stored on
+            <strong>Supabase</strong>, a cloud database infrastructure provider, using encrypted connections
+            (HTTPS/TLS) between your device and our servers. Access to stored data is restricted by
+            role-based access control (RBAC) — only authorised Solitaire Finz Mart staff assigned to a given
+            case can view its details.</p>
+            <p>We retain application data for as long as reasonably necessary to service the loan relationship
+            and to meet statutory/regulatory record-keeping requirements applicable to DSA and financial
+            advisory operations in India. Data may be deleted or anonymised upon request, subject to any
+            legal retention obligations.</p>
+            <p>We do not use your data for unrelated marketing without consent, and we do not share credentials
+            or documents outside the specific lender workflow for which they were submitted.</p>
+        </section>
+
+        <section class="section" id="rights">
+            <h2><span class="idx">04</span> Your Rights</h2>
+            <ul>
+                <li>You may request a copy of the personal data we hold about you.</li>
+                <li>You may request correction of inaccurate information.</li>
+                <li>You may request deletion of your data, subject to statutory retention requirements tied to
+                loan/KYC records.</li>
+                <li>You may withdraw consent for further contact at any time (this does not affect an
+                already-submitted application under active processing with a lender).</li>
+            </ul>
+        </section>
+
+        <section class="section" id="contact">
+            <h2><span class="idx">05</span> Contact</h2>
+            <div class="contact-box">
+                <div class="label">Business</div>
+                Solitaire Finz Mart — Loan DSA &amp; Financial Advisory<br/>
+                Bhiwandi, Thane District, Maharashtra, India<br/><br/>
+                <div class="label">For privacy / data requests</div>
+                Please reach out through the contact channel listed on our main application or WhatsApp Business
+                number as shared with you during your enquiry.
+            </div>
+        </section>
+    </div>
+
+    <footer class="site-footer">
+        © 2026 Solitaire Finz Mart. All rights reserved. &nbsp;|&nbsp;
+        <a href="index.html">Home</a> &nbsp;·&nbsp;
+        <a href="technical.html">Technical Evaluation</a> &nbsp;·&nbsp;
+        <a href="legal.html">Legal Evaluation</a>
+    </footer>
+
+</body>
+</html>
