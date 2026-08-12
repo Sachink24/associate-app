@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Legal | Privacy Policy &amp; Terms | Solitaire Finz Mart</title>
+    <title>Legal Evaluation Report | Solitaire Finz Mart</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,6 +12,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
     <style>
+        /* ============================================================
+               STYLES
+               ============================================================ */
         :root {
             --bg: #0A0D12;
             --panel: #12161D;
@@ -23,6 +27,12 @@
             --ink-dim: #9BA3AE;
             --ink-faint: #6B7280;
             --navy: #141A26;
+            --ok: #5FA97A;
+            --ok-bg: rgba(95, 169, 122, 0.12);
+            --warn: #CF9A45;
+            --warn-bg: rgba(207, 154, 69, 0.12);
+            --bad: #C1594E;
+            --bad-bg: rgba(193, 89, 78, 0.12);
             --radius: 10px;
             --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
         }
@@ -40,19 +50,39 @@
             --shadow: 0 8px 24px rgba(30, 25, 15, 0.10);
         }
 
-        * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             background: var(--bg);
             color: var(--ink);
             font-family: 'Inter', sans-serif;
             min-height: 100dvh;
             -webkit-font-smoothing: antialiased;
+            transition: background .25s ease, color .25s ease;
         }
-        .serif { font-family: 'Cormorant Garamond', serif; }
-        .mono { font-family: 'IBM Plex Mono', monospace; }
-        a { color: inherit; }
 
+        .serif {
+            font-family: 'Cormorant Garamond', serif;
+        }
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        a {
+            color: inherit;
+        }
+        ::selection {
+            background: rgba(196, 166, 114, 0.3);
+        }
+
+        /* ===== Topbar ===== */
         .topbar {
             position: sticky;
             top: 0;
@@ -61,201 +91,1688 @@
             border-bottom: 1px solid var(--border);
             padding: 10px 16px;
         }
+
         .topbar-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            max-width: 820px;
-            margin: 0 auto;
-        }
-        .brandmark { display: flex; align-items: center; gap: 10px; min-width: 0; }
-        .crest {
-            width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%;
-            background: radial-gradient(circle at 32% 28%, var(--gold-bright), var(--gold) 55%, #7c6640 100%);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 0 1px var(--border), inset 0 0 6px rgba(0,0,0,.35);
-        }
-        .crest span { font-family: 'Cormorant Garamond', serif; font-weight: 700; color: #0A0D12; font-size: 15px; }
-        .brand-text .name { font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: 17px; letter-spacing: .3px; line-height: 1.1; white-space: nowrap; }
-        .brand-text .sub { font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--gold); opacity: .9; }
-        .icon-btn {
-            width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
-            background: var(--panel); color: var(--ink); display: flex; align-items: center;
-            justify-content: center; cursor: pointer; font-size: 15px;
         }
 
-        /* nav rail linking all three pages */
-        .rail {
-            display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px;
-            max-width: 820px; margin: 0 auto; background: var(--bg);
-            border-bottom: 1px solid var(--border-soft); scrollbar-width: none;
+        .brandmark {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
         }
-        .rail::-webkit-scrollbar { display: none; }
-        .rail-item {
-            flex: 0 0 auto; padding: 6px 13px; border-radius: 100px; border: 1px solid var(--border);
-            background: var(--panel); font-size: 11.5px; color: var(--ink-dim); text-decoration: none;
+
+        .crest {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: radial-gradient(circle at 32% 28%, var(--gold-bright), var(--gold) 55%, #7c6640 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 1px var(--border), inset 0 0 6px rgba(0, 0, 0, .35);
+        }
+
+        .crest span {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            color: #0A0D12;
+            font-size: 15px;
+        }
+
+        .brand-text {
+            min-width: 0;
+        }
+
+        .brand-text .name {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            font-size: 17px;
+            letter-spacing: .3px;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .brand-text .sub {
+            font-size: 10px;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            color: var(--gold);
+            opacity: .9;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
+        .icon-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        select.role-select {
+            background: var(--panel);
+            color: var(--ink);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 8px;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+        }
+
+        .meta-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            font-size: 10.5px;
+            letter-spacing: .6px;
+            text-transform: uppercase;
+            font-weight: 600;
+            padding: 4px 9px;
+            border-radius: 100px;
+            border: 1px solid transparent;
             white-space: nowrap;
         }
-        .rail-item.active { border-color: var(--gold); color: var(--gold); }
 
-        .wrap { max-width: 820px; margin: 0 auto; padding: 20px 16px 100px 16px; }
-
-        .hero { margin-bottom: 22px; }
-        .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700; margin: 0 0 6px 0; }
-        .hero .updated { font-size: 11.5px; color: var(--ink-faint); }
-        .mono.updated { font-family: 'IBM Plex Mono', monospace; }
-
-        .toc {
-            background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 14px 16px; margin-bottom: 20px;
+        .badge-draft {
+            background: rgba(155, 163, 174, .14);
+            color: var(--ink-dim);
+            border-color: rgba(155, 163, 174, .3);
         }
-        .toc-title { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
-        .toc a { display: block; font-size: 13px; color: var(--ink-dim); padding: 4px 0; text-decoration: none; }
-        .toc a:hover { color: var(--gold); }
+
+        .badge-submitted {
+            background: rgba(196, 166, 114, .14);
+            color: var(--gold);
+            border-color: var(--border);
+        }
+
+        .badge-review {
+            background: var(--warn-bg);
+            color: var(--warn);
+            border-color: rgba(207, 154, 69, .35);
+        }
+
+        .badge-approved {
+            background: var(--ok-bg);
+            color: var(--ok);
+            border-color: rgba(95, 169, 122, .35);
+        }
+
+        .badge-rejected {
+            background: var(--bad-bg);
+            color: var(--bad);
+            border-color: rgba(193, 89, 78, .35);
+        }
+
+        .app-no {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11.5px;
+            color: var(--ink-dim);
+        }
+
+        /* progress bar */
+        .progress-wrap {
+            margin-top: 10px;
+        }
+
+        .progress-track {
+            height: 5px;
+            background: var(--border-soft);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+            border-radius: 4px;
+            transition: width .4s ease;
+        }
+
+        .progress-label {
+            font-size: 10.5px;
+            color: var(--ink-faint);
+            margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* section nav rail (horizontal scroll on mobile) */
+        .rail {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 10px 16px 4px 16px;
+            scrollbar-width: none;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        .rail::-webkit-scrollbar {
+            display: none;
+        }
+
+        .rail-item {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 11px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            font-size: 11.5px;
+            color: var(--ink-dim);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .rail-item .num {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--border-soft);
+            color: var(--ink-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9.5px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .rail-item.active {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .rail-item.active .num {
+            background: var(--gold);
+            color: #0A0D12;
+        }
+
+        .rail-item.done .num {
+            background: var(--ok);
+            color: #0A0D12;
+        }
+
+        /* ===== Layout ===== */
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 14px 16px 120px 16px;
+        }
 
         .section {
-            background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 18px 16px; margin-bottom: 12px; scroll-margin-top: 110px;
-        }
-        .section h2 {
-            font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 700;
-            color: var(--gold-bright); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;
-        }
-        .section h2 .idx { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--gold); }
-        .section p, .section li { font-size: 13.5px; line-height: 1.65; color: var(--ink); margin: 0 0 10px 0; }
-        .section ul { margin: 0 0 10px 0; padding-left: 20px; }
-        .section strong { color: var(--gold-bright); font-weight: 600; }
-        .divider { border: none; border-top: 1px solid var(--border-soft); margin: 24px 0; }
-
-        .contact-box {
-            background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius);
-            padding: 16px; font-size: 13px; line-height: 1.7;
-        }
-        .contact-box .label { color: var(--ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; }
-
-        footer.site-footer {
-            max-width: 820px; margin: 0 auto; padding: 20px 16px 40px 16px;
-            font-size: 11px; color: var(--ink-faint); text-align: center;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            overflow: hidden;
+            scroll-margin-top: 120px;
         }
 
-        @media (min-width: 720px) {
-            .hero h1 { font-size: 36px; }
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .section-head:active {
+            background: var(--panel-2);
+        }
+
+        .section-head-left {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+        }
+
+        .section-idx {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--gold);
+            width: 28px;
+            flex: 0 0 auto;
+        }
+
+        .section-title {
+            font-size: 14.5px;
+            font-weight: 600;
+            letter-spacing: .2px;
+        }
+
+        .section-desc {
+            font-size: 11px;
+            color: var(--ink-faint);
+            margin-top: 2px;
+        }
+
+        .section-status {
+            font-size: 10px;
+            color: var(--ink-faint);
+            flex: 0 0 auto;
+            text-align: right;
+        }
+
+        .chev {
+            transition: transform .25s ease;
+            color: var(--ink-faint);
+            flex: 0 0 auto;
+        }
+
+        .section.open .chev {
+            transform: rotate(180deg);
+        }
+
+        .section-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .3s ease;
+            border-top: 1px solid var(--border-soft);
+        }
+
+        .section.open .section-body {
+            max-height: 6000px;
+        }
+
+        .section-body-inner {
+            padding: 14px;
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 11px;
+        }
+
+        .field {
+            margin-bottom: 11px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        .field label {
+            display: block;
+            font-size: 11px;
+            color: var(--ink-dim);
+            margin-bottom: 5px;
+            letter-spacing: .2px;
+        }
+
+        .field label .req {
+            color: var(--bad);
+            margin-left: 2px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        select,
+        textarea,
+        input[type="search"] {
+            width: 100%;
+            background: var(--navy);
+            border: 1px solid var(--border);
+            color: var(--ink);
+            border-radius: 7px;
+            padding: 9px 10px;
+            font-size: 13.5px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: 2px solid var(--gold);
+            outline-offset: 1px;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 56px;
+        }
+
+        .field.invalid input,
+        .field.invalid select,
+        .field.invalid textarea {
+            border-color: var(--bad);
+        }
+
+        .hint-err {
+            font-size: 10.5px;
+            color: var(--bad);
+            margin-top: 4px;
+            display: none;
+        }
+
+        .field.invalid .hint-err {
+            display: block;
+        }
+
+        .radio-row,
+        .chip-row {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            padding: 7px 12px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            background: var(--navy);
+            font-size: 12px;
+            color: var(--ink-dim);
+            cursor: pointer;
+        }
+
+        .chip.sel {
+            border-color: var(--gold);
+            color: var(--gold);
+            background: rgba(196, 166, 114, .1);
+        }
+
+        .chip.sel.ok {
+            border-color: var(--ok);
+            color: var(--ok);
+            background: var(--ok-bg);
+        }
+
+        .chip.sel.bad {
+            border-color: var(--bad);
+            color: var(--bad);
+            background: var(--bad-bg);
+        }
+
+        .chip.sel.warn {
+            border-color: var(--warn);
+            color: var(--warn);
+            background: var(--warn-bg);
+        }
+
+        /* verification checklist rows */
+        .verify-row {
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 10px 11px;
+            margin-bottom: 8px;
+            background: var(--panel-2);
+        }
+
+        .verify-row-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .verify-name {
+            font-size: 12.5px;
+            font-weight: 500;
+        }
+
+        .verify-note {
+            font-size: 10.5px;
+            color: var(--ink-faint);
+            margin-top: 2px;
+        }
+
+        .verify-remarks {
+            margin-top: 8px;
+            display: none;
+        }
+
+        .verify-remarks.show {
+            display: block;
+        }
+
+        .verify-remarks input {
+            font-size: 12px;
+            padding: 7px 9px;
+        }
+
+        .divider-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--gold);
+            margin: 14px 0 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .divider-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-soft);
+        }
+
+        /* photo upload */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .photo-slot {
+            aspect-ratio: 1;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--navy);
+            cursor: pointer;
+        }
+
+        .photo-slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-slot .plus {
+            color: var(--ink-faint);
+            font-size: 22px;
+        }
+
+        .photo-slot .label-tag {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, .6);
+            color: #fff;
+            font-size: 8.5px;
+            padding: 2px 4px;
+            text-align: center;
+        }
+
+        .photo-slot .rm {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            background: rgba(0, 0, 0, .65);
+            color: #fff;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .gps-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--navy);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 8px;
+        }
+
+        .gps-box .coords {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11.5px;
+            color: var(--ink-dim);
+            flex: 1;
+        }
+
+        .btn-mini {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            border-radius: 7px;
+            padding: 7px 11px;
+            font-size: 11.5px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn-mini:active {
+            background: rgba(196, 166, 114, .12);
+        }
+
+        /* signature */
+        .sig-pad-wrap {
+            margin-top: 8px;
+        }
+
+        canvas.sigpad {
+            width: 100%;
+            height: 120px;
+            background: var(--navy);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            touch-action: none;
+        }
+
+        .sig-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        /* seal */
+        .seal-wrap {
+            display: flex;
+            justify-content: center;
+            padding: 10px 0 4px 0;
+        }
+
+        .seal {
+            width: 118px;
+            height: 118px;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border: 2px solid var(--gold);
+            box-shadow: 0 0 0 4px rgba(196, 166, 114, .1), 0 0 22px rgba(196, 166, 114, .12);
+            background: radial-gradient(circle, rgba(196, 166, 114, .08), transparent 70%);
+            opacity: .35;
+            filter: grayscale(1);
+            transition: opacity .3s ease, filter .3s ease;
+        }
+
+        .seal.active {
+            opacity: 1;
+            filter: none;
+        }
+
+        .seal-ring {
+            position: absolute;
+            inset: 6px;
+            border-radius: 50%;
+            border: 1px dashed var(--border);
+        }
+
+        .seal-text {
+            font-family: 'Cormorant Garamond', serif;
+            line-height: 1.15;
+        }
+
+        .seal-text .st1 {
+            font-size: 9px;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        .seal-text .st2 {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 2px 0;
+        }
+
+        .seal-text .st3 {
+            font-size: 8.5px;
+            color: var(--ink-faint);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* risk meter */
+        .risk-meter {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .risk-seg {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: var(--border-soft);
+        }
+
+        .risk-seg.low.active {
+            background: var(--ok);
+        }
+
+        .risk-seg.med.active {
+            background: var(--warn);
+        }
+
+        .risk-seg.high.active {
+            background: var(--bad);
+        }
+
+        /* bottom action bar */
+        .actionbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            background: linear-gradient(0deg, var(--bg) 60%, rgba(10, 13, 18, 0));
+            padding: 14px 16px 16px 16px;
+        }
+
+        .actionbar-inner {
+            max-width: 760px;
+            margin: 0 auto;
+            display: flex;
+            gap: 8px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .btn {
+            flex: 1;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 11px 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--ink-dim);
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+            color: #0A0D12;
+            border-color: transparent;
+        }
+
+        .btn-ok {
+            background: var(--ok-bg);
+            color: var(--ok);
+            border-color: rgba(95, 169, 122, .35);
+        }
+
+        .btn-bad {
+            background: var(--bad-bg);
+            color: var(--bad);
+            border-color: rgba(193, 89, 78, .35);
+        }
+
+        .toast {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-140%);
+            background: var(--panel);
+            border: 1px solid var(--gold);
+            color: var(--ink);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            z-index: 99;
+            transition: transform .3s ease;
+            box-shadow: var(--shadow);
+            max-width: 88vw;
+            text-align: center;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .autosave-note {
+            font-size: 10px;
+            color: var(--ink-faint);
+            text-align: center;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 420px) {
+            .field-grid {
+                grid-template-columns: 1fr;
+            }
+            .photo-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (min-width: 760px) {
+            .wrap {
+                padding-top: 18px;
+            }
+        }
+
+        @media print {
+            .topbar,
+            .rail,
+            .actionbar,
+            .toast {
+                display: none !important;
+            }
+            body {
+                background: #fff;
+                color: #111;
+            }
+            .section {
+                break-inside: avoid;
+                border-color: #ccc;
+                background: #fff;
+                box-shadow: none;
+            }
+            .section-body {
+                max-height: none !important;
+            }
+            .wrap {
+                padding-bottom: 20px;
+                max-width: 100%;
+            }
         }
     </style>
 </head>
-<body>
 
-    <header class="topbar">
+<body data-theme="dark">
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ===== TOPBAR ===== -->
+    <div class="topbar">
         <div class="topbar-row">
             <div class="brandmark">
                 <div class="crest"><span>S</span></div>
                 <div class="brand-text">
-                    <div class="name">Solitaire Finz Mart</div>
-                    <div class="sub">Legal &amp; Compliance</div>
+                    <div class="name serif">Solitaire Finz Mart</div>
+                    <div class="sub">Legal Evaluation Report</div>
                 </div>
             </div>
-            <button class="icon-btn" id="themeToggle" title="Toggle theme" onclick="document.documentElement.toggleAttribute('data-theme')">&#9788;</button>
-        </div>
-    </header>
-
-    <nav class="rail">
-        <a class="rail-item" href="index.html">Home</a>
-        <a class="rail-item" href="technical.html">Technical Evaluation</a>
-        <a class="rail-item active" href="legal.html">Legal</a>
-    </nav>
-
-    <div class="wrap">
-        <div class="hero">
-            <h1 class="serif">Privacy Policy &amp; Terms of Service</h1>
-            <div class="updated mono">Last updated: 1 August 2026 &nbsp;·&nbsp; Applies to Solitaire Finz Mart, Bhiwandi, Maharashtra</div>
-        </div>
-
-        <div class="toc">
-            <div class="toc-title">On this page</div>
-            <a href="#privacy">1. Privacy Policy</a>
-            <a href="#terms">2. Terms &amp; Conditions</a>
-            <a href="#data">3. Data Storage &amp; Processing (Supabase)</a>
-            <a href="#rights">4. Your Rights</a>
-            <a href="#contact">5. Contact</a>
-        </div>
-
-        <section class="section" id="privacy">
-            <h2><span class="idx">01</span> Privacy Policy</h2>
-            <p>Solitaire Finz Mart ("we", "us", "our") operates as a Direct Selling Agent (DSA) and loan advisory
-            business in Bhiwandi, Maharashtra, facilitating loan and financial products on behalf of partner banks
-            and NBFCs. This Privacy Policy explains how we collect, use, store, and protect personal and financial
-            information submitted through our website, lead management platform, and related tools.</p>
-            <p><strong>Information we collect</strong> may include: name, contact details, address, PAN/Aadhaar
-            details (where required for KYC), income and employment information, property details, loan requirement
-            details, CIBIL score and credit history references, and documents uploaded for underwriting purposes.</p>
-            <p><strong>How we use it:</strong> to assess loan eligibility, match applicants with suitable lenders
-            (banks/NBFCs), process applications, communicate status updates, and comply with regulatory
-            requirements. We do not sell personal data to third parties. Data is shared only with the specific
-            bank/NBFC selected for an application, and only to the extent required to process that application.</p>
-        </section>
-
-        <section class="section" id="terms">
-            <h2><span class="idx">02</span> Terms &amp; Conditions</h2>
-            <p>By using this website or submitting an enquiry, you agree to the following terms:</p>
-            <ul>
-                <li>Solitaire Finz Mart acts as an intermediary/DSA and does not itself sanction or disburse loans.
-                Final approval, interest rates, and terms are determined solely by the partner bank/NBFC.</li>
-                <li>Submission of an enquiry or application does not guarantee loan approval.</li>
-                <li>You confirm that all information and documents provided are true, accurate, and belong to you
-                or an applicant you are authorised to represent.</li>
-                <li>Processing fees, if any, are charged by the respective bank/NBFC as per their policy and are
-                separately communicated; Solitaire Finz Mart's advisory role does not itself levy hidden charges.</li>
-                <li>We reserve the right to decline to process an enquiry that appears fraudulent, incomplete, or
-                non-compliant with applicable regulations.</li>
-            </ul>
-        </section>
-
-        <section class="section" id="data">
-            <h2><span class="idx">03</span> Data Storage &amp; Processing</h2>
-            <p>Lead, application, and workflow data submitted through our platform is stored on
-            <strong>Supabase</strong>, a cloud database infrastructure provider, using encrypted connections
-            (HTTPS/TLS) between your device and our servers. Access to stored data is restricted by
-            role-based access control (RBAC) — only authorised Solitaire Finz Mart staff assigned to a given
-            case can view its details.</p>
-            <p>We retain application data for as long as reasonably necessary to service the loan relationship
-            and to meet statutory/regulatory record-keeping requirements applicable to DSA and financial
-            advisory operations in India. Data may be deleted or anonymised upon request, subject to any
-            legal retention obligations.</p>
-            <p>We do not use your data for unrelated marketing without consent, and we do not share credentials
-            or documents outside the specific lender workflow for which they were submitted.</p>
-        </section>
-
-        <section class="section" id="rights">
-            <h2><span class="idx">04</span> Your Rights</h2>
-            <ul>
-                <li>You may request a copy of the personal data we hold about you.</li>
-                <li>You may request correction of inaccurate information.</li>
-                <li>You may request deletion of your data, subject to statutory retention requirements tied to
-                loan/KYC records.</li>
-                <li>You may withdraw consent for further contact at any time (this does not affect an
-                already-submitted application under active processing with a lender).</li>
-            </ul>
-        </section>
-
-        <section class="section" id="contact">
-            <h2><span class="idx">05</span> Contact</h2>
-            <div class="contact-box">
-                <div class="label">Business</div>
-                Solitaire Finz Mart — Loan DSA &amp; Financial Advisory<br/>
-                Bhiwandi, Thane District, Maharashtra, India<br/><br/>
-                <div class="label">For privacy / data requests</div>
-                Please reach out through the contact channel listed on our main application or WhatsApp Business
-                number as shared with you during your enquiry.
+            <div class="topbar-actions">
+                <select class="role-select" id="roleSelect" title="Switch role view">
+                    <option value="valuer">Legal Associate (Advocate)</option>
+                    <option value="admin">DSA Admin</option>
+                    <option value="agent">Agent (view only)</option>
+                </select>
+                <button class="icon-btn" id="themeToggle" title="Toggle dark/light">&#9789;</button>
             </div>
-        </section>
+        </div>
+        <nav style="display:flex;gap:6px;overflow-x:auto;padding-top:10px;">
+            <a href="index.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Home</a>
+            <a href="technical.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Technical Evaluation</a>
+            <a href="legal.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--gold);background:var(--panel);font-size:11.5px;color:var(--gold);text-decoration:none;white-space:nowrap;">Legal Evaluation</a>
+            <a href="privacy.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Privacy</a>
+        </nav>
+        <div class="meta-row">
+            <span class="badge badge-draft" id="statusBadge">Draft</span>
+            <span class="app-no" id="appNoLabel" title="Click to load a different report" style="cursor:pointer; text-decoration:underline dotted;">LN-2026-00842</span>
+        </div>
+        <div class="progress-wrap">
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill" style="width:0%"></div>
+            </div>
+            <div class="progress-label">
+                <span id="progressPct">0% complete</span>
+                <span id="autosaveTxt">Not saved yet</span>
+            </div>
+        </div>
     </div>
 
-    <footer class="site-footer">
-        © 2026 Solitaire Finz Mart. All rights reserved. &nbsp;|&nbsp;
-        <a href="index.html">Home</a> &nbsp;·&nbsp;
-        <a href="technical.html">Technical Evaluation</a>
-    </footer>
+    <!-- ===== RAIL ===== -->
+    <div class="rail" id="rail"></div>
 
+    <!-- ===== FORM ===== -->
+    <div class="wrap" id="formRoot"></div>
+
+    <!-- ===== ACTION BAR ===== -->
+    <div class="actionbar">
+        <div class="actionbar-inner" id="actionBar"></div>
+    </div>
+
+    <script>
+        /* ============================================================
+               JAVASCRIPT
+               ============================================================ */
+
+        // -------------------------------------------------------------
+        // STATE
+        // -------------------------------------------------------------
+        const state = {
+            role: 'valuer',
+            status: 'draft', // draft | submitted | review | approved | rejected
+            data: {},
+            photos: {}, // slot -> dataURL
+            gps: null,
+            signature: null,
+            openSection: 'sec1'
+        };
+
+        // ---------- Sample / dummy prefill data ----------
+        const dummyLead = {
+            loanAppNo: 'LN-2026-00842',
+            borrowers: 'Rajesh Kumar Sharma, Sunita R. Sharma (Co-Applicant)',
+            propertyAddress: 'Flat No. 402, Sai Krupa CHS, Anjur Phata Road, Bhiwandi, Thane 421302',
+            reportDate: new Date().toISOString().slice(0, 10),
+            advocateName: 'V. R. Deshpande',
+            advocateEnrollmentNo: 'MAH/1284/2011'
+        };
+
+        // -------------------------------------------------------------
+        // SUPABASE CLOUD SYNC
+        // -------------------------------------------------------------
+        const SUPABASE_URL = "https://nbpvamrwzqrgoiwpadwc.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_GrJ_9z_y903WFMGjoAg82Q_cG3N2_Jx";
+        const sb = (window.supabase && window.supabase.createClient)
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+            : null;
+        const REPORT_TYPE = 'legal';
+        const MEDIA_BUCKET = 'evaluation-media';
+
+        async function uploadDataUrlToStorage(dataUrl, path, contentType) {
+            try {
+                const res = await fetch(dataUrl);
+                const blob = await res.blob();
+                const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, blob, { upsert: true, contentType });
+                return !error;
+            } catch (err) { console.error('upload error:', err); return false; }
+        }
+
+        async function loadReportFromCloud(appNo) {
+            if (!sb || !appNo) return false;
+            toast('Loading report ' + appNo + '…');
+            const { data, error } = await sb.from('evaluation_reports').select('*')
+                .eq('report_type', REPORT_TYPE).eq('loan_app_no', appNo).maybeSingle();
+            if (error || !data) { toast('No saved report found for ' + appNo + ' — starting new draft'); return false; }
+            state.status = data.status || 'draft';
+            state.data = data.data || {};
+            state.gps = data.gps || null;
+            state.photos = {};
+            const photoPaths = state.data.__photoPaths || {};
+            for (const slot in photoPaths) {
+                const { data: signed } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(photoPaths[slot], 3600);
+                if (signed) state.photos[slot] = signed.signedUrl;
+            }
+            if (data.signature_path) {
+                const { data: signed } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(data.signature_path, 3600);
+                if (signed) state.signature = signed.signedUrl;
+            }
+            toast('Report loaded from cloud');
+            renderAll();
+            return true;
+        }
+
+        async function syncReportToCloud(showToast) {
+            if (!sb) { if (showToast) toast('Cloud unavailable — not saved'); return false; }
+            const appNo = (state.data.loanAppNo || '').trim();
+            if (!appNo) { toast('Enter a Loan Application Number before saving'); return false; }
+            const savedEl = document.getElementById('autosaveTxt');
+            if (savedEl) savedEl.textContent = '⏳ Saving to cloud…';
+
+            const photoPaths = state.data.__photoPaths || {};
+            for (const slot in state.photos) {
+                const src = state.photos[slot];
+                if (src && src.startsWith('data:')) {
+                    const path = `legal/${appNo}/photo_${slot}_${Date.now()}.jpg`;
+                    const ok = await uploadDataUrlToStorage(src, path, 'image/jpeg');
+                    if (ok) photoPaths[slot] = path;
+                }
+            }
+            state.data.__photoPaths = photoPaths;
+
+            let signaturePath = state.data.__signaturePath || null;
+            if (state.signature && state.signature.startsWith('data:')) {
+                signaturePath = `legal/${appNo}/signature_${Date.now()}.png`;
+                await uploadDataUrlToStorage(state.signature, signaturePath, 'image/png');
+                state.data.__signaturePath = signaturePath;
+            }
+
+            const { error } = await sb.from('evaluation_reports').upsert({
+                report_type: REPORT_TYPE,
+                loan_app_no: appNo,
+                status: state.status,
+                data: state.data,
+                gps: state.gps,
+                signature_path: signaturePath,
+                updated_by: state.role,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'report_type,loan_app_no' });
+
+            if (error) {
+                console.error('Supabase save error:', error);
+                if (savedEl) savedEl.textContent = '⚠️ Cloud save failed';
+                if (showToast) toast('Save failed: ' + error.message);
+                return false;
+            }
+            if (savedEl) savedEl.textContent = '☁️ Saved · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return true;
+        }
+
+        // -------------------------------------------------------------
+        // SCHEMA
+        // -------------------------------------------------------------
+        const schema = [{
+            id: 'sec1',
+            title: 'Report Header',
+            desc: 'Application, applicant & bank details',
+            fields: [
+                { key: 'loanAppNo', label: 'Loan Application Number', type: 'text', req: true, prefill: true },
+                { key: 'borrowers', label: 'Applicant / Borrower Name(s)', type: 'text', req: true, prefill: true,
+                    full: true },
+                { key: 'sellerName', label: 'Property Owner / Seller Name(s)', type: 'text', req: true,
+                full: true },
+                { key: 'propertyAddress', label: 'Property Address', type: 'textarea', req: true, prefill: true,
+                    full: true },
+                { key: 'reportDate', label: 'Report Date', type: 'date', req: true, prefill: true },
+                { key: 'advocateName', label: 'Advocate Name', type: 'text', req: true, prefill: true },
+                { key: 'advocateEnrollmentNo', label: 'Bar Enrollment Number', type: 'text', req: true,
+                    prefill: true },
+                { key: 'bankName', label: 'Bank / NBFC Name', type: 'select', req: true, options: ['ICICI Bank',
+                        'Axis Bank', 'State Bank of India', 'PNB Housing', 'HDFC Ltd', 'Piramal Finance',
+                        'Godrej Capital', 'Shriram Finance', 'Tata Capital', 'IIFL Finance'
+                    ] },
+                { key: 'loanType', label: 'Loan Type', type: 'select', req: true, options: ['Home Loan', 'LAP',
+                        'Balance Transfer', 'Construction Loan'
+                    ] },
+            ]
+        }, {
+            id: 'sec2',
+            title: 'Title Investigation',
+            desc: 'Ownership, property classification & root of title',
+            fields: [
+                { key: 'propertyClass', label: 'Property Classification', type: 'select', req: true, options: [
+                        'Corporation', 'Gram Panchayat', 'Gauthan', 'CIDCO', 'MHADA', 'SRA', 'Private Freehold'
+                    ] },
+                { key: 'ownershipType', label: 'Ownership Type', type: 'select', req: true, options: ['Freehold',
+                        'Leasehold', 'Government Grant'
+                    ] },
+                { key: 'titleFlow', label: 'Flow of Title / Chain of Ownership (narrative)', type: 'textarea',
+                    req: true, full: true },
+                { key: 'rootOfTitleYears', label: 'Root of Title Searched (years)', type: 'number' },
+                { key: 'ecPeriod', label: 'Encumbrance Certificate Period Covered', type: 'text' },
+                { key: 'encumbranceFound', label: 'Encumbrance Found in EC', type: 'radio', options: ['Yes', 'No'] },
+                { key: 'encumbranceDetails', label: 'Encumbrance Details (if any)', type: 'textarea', full: true },
+            ]
+        }, {
+            id: 'sec3',
+            title: 'Document Verification',
+            desc: 'Mark each document verified / issues found',
+            type: 'verify',
+            items: [
+                '7/12 Extract / Property Card',
+                'Index II',
+                'Sale Deed / Conveyance Deed',
+                'Agreement for Sale',
+                'Encumbrance Certificate (EC)',
+                'Mutation Entry / Ferfar',
+                'Society Share Certificate & NOC',
+                'Approved Building Plan / Layout',
+                'Occupancy / Completion Certificate (OC/CC)',
+                'RERA Registration Certificate',
+                'Power of Attorney (if any)',
+                'Succession / Legal Heir Certificate (if applicable)'
+            ]
+        }, {
+            id: 'sec4',
+            title: 'Litigation & Encumbrance Search',
+            desc: 'Court records, revenue records & dispute history',
+            fields: [
+                { key: 'searchAgency', label: 'Search Conducted By', type: 'text' },
+                { key: 'searchPeriodYears', label: 'Search Period (years)', type: 'number', req: true },
+                { key: 'courtSearchDone', label: 'Court Records Search Completed', type: 'radio', options: ['Yes',
+                        'No'
+                    ], req: true },
+                { key: 'litigationPending', label: 'Litigation / Dispute Pending', type: 'radio', options: ['Yes',
+                        'No'
+                    ], req: true },
+                { key: 'litigationDetails', label: 'Litigation Details (if any)', type: 'textarea', full: true },
+                { key: 'revenueRecordsMatch', label: 'Revenue Records Match Title Documents', type: 'radio',
+                    options: ['Yes', 'No'] },
+                { key: 'disputeHistory', label: 'Dispute / Objection History', type: 'textarea', full: true },
+            ]
+        }, {
+            id: 'sec5',
+            title: 'Statutory Compliance',
+            desc: 'Registration, stamp duty & regulatory sign-offs',
+            fields: [
+                { key: 'stampDutyPaid', label: 'Stamp Duty Paid & Adequate', type: 'radio', options: ['Yes',
+                        'No'
+                    ], req: true },
+                { key: 'registrationCompleted', label: 'Document Registration Completed', type: 'radio', options: [
+                        'Yes', 'No'
+                    ], req: true },
+                { key: 'reraStatus', label: 'RERA Registration Verified', type: 'radio', options: ['Yes', 'No',
+                        'N/A'
+                    ] },
+                { key: 'municipalApprovalStatus', label: 'Municipal Approvals Verified', type: 'radio', options: [
+                        'Yes', 'No'
+                    ] },
+                { key: 'societyNocStatus', label: 'Society NOC for Mortgage', type: 'radio', options: ['Yes', 'No',
+                        'N/A'
+                    ] },
+                { key: 'cersaiRegistration', label: 'CERSAI Registration Status', type: 'radio', options: ['Yes',
+                        'No', 'Pending'
+                    ] },
+            ]
+        }, {
+            id: 'sec6',
+            title: 'Technical Status Summary',
+            desc: 'Read-only — linked from Technical Evaluation Report',
+            fields: [
+                { key: 'techValuation', label: 'Property Valuation Status', type: 'readonly', value: 'Completed' },
+                { key: 'techExists', label: 'Property Physically Verified', type: 'readonly', value: 'Yes' },
+                { key: 'techCompliance', label: 'Construction Compliance', type: 'readonly', value: 'Compliant' },
+            ]
+        }, {
+            id: 'sec7',
+            title: 'Legal Risk Assessment & Recommendation',
+            desc: 'Overall conclusion for the credit file',
+            fields: [
+                { key: 'riskLevel', label: 'Legal Risk Level', type: 'riskchips' },
+                { key: 'riskFactors', label: 'Risk Factors', type: 'textarea', full: true },
+                { key: 'titleDefects', label: 'Title Defects Identified', type: 'textarea', full: true },
+                { key: 'conditions', label: 'Conditions Precedent (if any)', type: 'textarea', full: true },
+                { key: 'recommendation', label: 'Overall Recommendation', type: 'radio', options: ['Clear Title',
+                        'Title with Conditions', 'Not Clear / Rejected'
+                    ], req: true },
+                { key: 'remarks', label: "Advocate's Comments / Remarks", type: 'textarea', full: true },
+                { key: 'conclusion', label: 'Final Legal Opinion', type: 'textarea', full: true, req: true },
+            ]
+        }, {
+            id: 'sec8',
+            title: 'Sign-off',
+            desc: 'Digital signature & review status',
+            fields: [
+                { key: 'signature', label: 'Advocate Signature', type: 'signature' },
+                { key: 'seal', label: 'Report Seal', type: 'seal' },
+            ]
+        }, ];
+
+        // -------------------------------------------------------------
+        // INIT
+        // -------------------------------------------------------------
+        async function initReport() {
+            const params = new URLSearchParams(location.search);
+            const appParam = params.get('app');
+            let loaded = false;
+            if (appParam) {
+                loaded = await loadReportFromCloud(appParam.trim());
+            }
+            if (!loaded) {
+                schema.forEach(sec => {
+                    (sec.fields || []).forEach(f => {
+                        if (f.prefill && dummyLead[f.key] && !state.data[f.key]) state.data[f.key] = dummyLead[f.key];
+                    });
+                });
+                if (appParam) state.data.loanAppNo = appParam.trim();
+            }
+            schema.find(s => s.id === 'sec3').items.forEach((label, i) => {
+                if (!state.data['verify_' + i]) state.data['verify_' + i] = { status: 'pending', remarks: '' };
+            });
+            renderAll();
+        }
+
+        // -------------------------------------------------------------
+        // HELPERS
+        // -------------------------------------------------------------
+        function isReadOnly() {
+            return state.role === 'agent' || state.role === 'admin' ||
+                state.status === 'approved' || state.status === 'rejected';
+        }
+
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            clearTimeout(t._tm);
+            t._tm = setTimeout(() => t.classList.remove('show'), 2200);
+        }
+
+        function pct() {
+            let req = 0,
+                filled = 0;
+            schema.forEach(sec => {
+                if (sec.type === 'verify') {
+                    sec.items.forEach((label, i) => { req++;
+                        if (state.data['verify_' + i].status !== 'pending') filled++; });
+                    return;
+                }
+                (sec.fields || []).forEach(f => {
+                    if (f.type === 'readonly' || f.type === 'seal') return;
+                    if (f.req) { req++; if (state.data[f.key]) filled++; }
+                });
+            });
+            return req ? Math.round((filled / req) * 100) : 0;
+        }
+
+        function statusBadgeInfo() {
+            const map = {
+                draft: ['Draft', 'badge-draft'],
+                submitted: ['Submitted', 'badge-submitted'],
+                review: ['Under Review', 'badge-review'],
+                approved: ['Approved', 'badge-approved'],
+                rejected: ['Rejected', 'badge-rejected']
+            };
+            return map[state.status];
+        }
+
+        function escapeAttr(s) { return (s + '').replace(/"/g, '&quot;'); }
+
+        function escapeHTML(s) { return (s + '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+        function sectionComplete(sec) {
+            if (sec.type === 'verify') return sec.items.every((l, i) => state.data['verify_' + i].status !== 'pending');
+            return (sec.fields || []).filter(f => f.req).every(f => state.data[f.key]);
+        }
+
+        let submitAttempted = false;
+
+        function getMissingRequired() {
+            const missing = [];
+            schema.forEach(sec => {
+                (sec.fields || []).forEach(f => { if (f.req && !state.data[f.key]) missing.push(f.key); });
+            });
+            return missing;
+        }
+
+        // -------------------------------------------------------------
+        // RENDER: RAIL
+        // -------------------------------------------------------------
+        function renderRail() {
+            const rail = document.getElementById('rail');
+            rail.innerHTML = '';
+            schema.forEach((sec, i) => {
+                const done = sectionComplete(sec);
+                const el = document.createElement('div');
+                el.className = 'rail-item' + (state.openSection === sec.id ? ' active' : '') + (done ? ' done' : '');
+                el.innerHTML = `<span class="num">${done ? '&#10003;' : i + 1}</span><span>${sec.title}</span>`;
+                el.onclick = () => {
+                    state.openSection = sec.id;
+                    renderAll();
+                    document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                };
+                rail.appendChild(el);
+            });
+        }
+
+        // -------------------------------------------------------------
+        // RENDER: FORM
+        // -------------------------------------------------------------
+        function renderForm() {
+            const root = document.getElementById('formRoot');
+            root.innerHTML = schema.map((sec, i) => {
+                const open = state.openSection === sec.id;
+                const complete = sectionComplete(sec);
+                let body = '';
+                if (sec.type === 'verify') {
+                    body = verifySectionHTML(sec);
+                } else {
+                    body = `<div class="field-grid">${sec.fields.map(f => fieldHTML(f, sec.id)).join('')}</div>`;
+                }
+                return `<div class="section${open ? ' open' : ''}" id="${sec.id}">
+              <div class="section-head" onclick="toggleSection('${sec.id}')">
+                <div class="section-head-left">
+                  <div class="section-idx">${String(i + 1).padStart(2, '0')}</div>
+                  <div>
+                    <div class="section-title">${sec.title}</div>
+                    <div class="section-desc">${sec.desc}</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="section-status">${complete ? 'Complete' : 'Pending'}</div>
+                  <div class="chev">&#9660;</div>
+                </div>
+              </div>
+              <div class="section-body"><div class="section-body-inner">${body}</div></div>
+            </div>`;
+            }).join('');
+
+            // attach change handlers for text/number/date/select/textarea
+            root.querySelectorAll('[data-key]').forEach(el => {
+                if (el.classList.contains('radio-row')) return;
+                el.addEventListener('input', e => {
+                    state.data[el.dataset.key] = el.value;
+                    updateProgressOnly();
+                });
+            });
+
+            // photo input
+            const photoInput = document.getElementById('photoInput');
+            if (photoInput) {
+                photoInput.addEventListener('change', e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    compressImage(file, dataUrl => {
+                        state.photos[window._photoSlot] = dataUrl;
+                        renderAll();
+                    });
+                });
+            }
+
+            initSignaturePad();
+        }
+
+        // ---------- Field renderers ----------
+        function fieldHTML(f, secId) {
+            const val = state.data[f.key] ?? '';
+            const ro = isReadOnly();
+            const cls = 'field' + (f.full ? ' full' : '');
+            const reqStar = f.req ? '<span class="req">*</span>' : '';
+            let inner = '';
+            switch (f.type) {
+                case 'text':
+                    inner =
+                        `<input type="text" data-key="${f.key}" value="${escapeAttr(val)}" ${ro ? 'disabled' : ''} placeholder="Enter ${f.label.toLowerCase()}">`;
+                    break;
+                case 'number':
+                    inner =
+                        `<input type="number" data-key="${f.key}" value="${escapeAttr(val)}" ${ro ? 'disabled' : ''} placeholder="0">`;
+                    break;
+                case 'date':
+                    inner =
+                        `<input type="date" data-key="${f.key}" value="${escapeAttr(val)}" ${ro ? 'disabled' : ''}>`;
+                    break;
+                case 'textarea':
+                    inner =
+                        `<textarea data-key="${f.key}" ${ro ? 'disabled' : ''} placeholder="Type here...">${escapeHTML(val)}</textarea>`;
+                    break;
+                case 'select':
+                    inner =
+                        `<select data-key="${f.key}" ${ro ? 'disabled' : ''}><option value="">Select...</option>${f.options.map(o => `<option value="${o}" ${val === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+                    break;
+                case 'radio':
+                    inner =
+                        `<div class="radio-row" data-key="${f.key}">${f.options.map(o => {
+                    const sel = val === o;
+                    let extra = sel ? (o === 'Yes' || o === 'Good' || o === 'Suitable' ? ' ok' : (o === 'No' || o === 'Poor' ? ' bad' : ' warn')) : '';
+                    return `<div class="chip${sel ? ' sel' + extra : ''}" data-val="${o}" ${ro ? '' : 'onclick="setRadio(\'' + f.key + '\',\'' + o + '\')"'}>${o}</div>`;
+                  }).join('')}</div>`;
+                    break;
+                case 'readonly':
+                    inner = `<input type="text" value="${escapeAttr(f.value)}" disabled style="opacity:.75">`;
+                    break;
+                case 'photos':
+                    inner = photosHTML();
+                    break;
+                case 'gps':
+                    inner = gpsHTML(ro);
+                    break;
+                case 'signature':
+                    inner = signatureHTML(ro);
+                    break;
+                case 'seal':
+                    inner = sealHTML();
+                    break;
+                case 'riskchips':
+                    inner = riskHTML(ro);
+                    break;
+                default:
+                    inner = '';
+            }
+            return `<div class="${cls}${(f.req && !val && submitAttempted) ? ' invalid' : ''}" id="f_${f.key}">
+            <label>${f.label}${reqStar}</label>
+            ${inner}
+            <div class="hint-err">This field is required before submission.</div>
+          </div>`;
+        }
+
+        function photosHTML() {
+            const labels = ['Front View', 'Rear View', 'Street View', 'Interior'];
+            return `<div class="photo-grid">${labels.map((l, i) => {
+            const src = state.photos[i];
+            return `<div class="photo-slot" onclick="triggerPhoto(${i})">
+              ${src ? `<img src="${src}"><div class="rm" onclick="event.stopPropagation();removePhoto(${i})">&times;</div>` : `<span class="plus">+</span>`}
+              <div class="label-tag">${l}</div>
+            </div>`;
+          }).join('')}</div>
+          <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none">`;
+        }
+
+        window._photoSlot = null;
+
+        function triggerPhoto(i) {
+            if (isReadOnly()) return;
+            window._photoSlot = i;
+            document.getElementById('photoInput').click();
+        }
+
+        function removePhoto(i) { delete state.photos[i];
+            renderAll(); }
+
+        function gpsHTML(ro) {
+            const g = state.gps;
+            return `<div class="gps-box">
+            <div class="coords">${g ? `Lat ${g.lat.toFixed(5)}, Lng ${g.lng.toFixed(5)}` : 'No coordinates captured'}</div>
+            <button class="btn-mini" ${ro ? 'disabled' : ''} onclick="captureGPS()">Capture GPS</button>
+          </div>`;
+        }
+
+        function captureGPS() {
+            if (!navigator.geolocation) { toast('Geolocation not supported on this device'); return; }
+            toast('Requesting location…');
+            navigator.geolocation.getCurrentPosition(pos => {
+                state.gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                renderAll();
+                toast('GPS captured');
+            }, err => { toast('Could not get location — check permissions'); });
+        }
+
+        function signatureHTML(ro) {
+            return `<div class="sig-pad-wrap">
+            <canvas class="sigpad" id="sigCanvas"></canvas>
+            <div class="sig-actions">
+              <button class="btn-mini" onclick="clearSig()" ${ro ? 'disabled' : ''}>Clear</button>
+              <button class="btn-mini" onclick="saveSig()" ${ro ? 'disabled' : ''}>Save Signature</button>
+            </div>
+          </div>`;
+        }
+
+        function sealHTML() {
+            const active = state.status !== 'draft';
+            return `<div class="seal-wrap"><div class="seal ${active ? 'active' : ''}">
+            <div class="seal-ring"></div>
+            <div class="seal-text">
+              <div class="st1">Solitaire</div>
+              <div class="st2 serif">${statusBadgeInfo()[0]}</div>
+              <div class="st3">${state.data.advocateEnrollmentNo || '—'}</div>
+            </div>
+          </div></div>`;
+        }
+
+        function riskHTML(ro) {
+            const levels = ['Low', 'Medium', 'High'];
+            const cur = state.data.riskLevel;
+            return `<div class="chip-row">${levels.map(l => {
+            const sel = cur === l;
+            const cls = l === 'Low' ? 'ok' : (l === 'Medium' ? 'warn' : 'bad');
+            return `<div class="chip${sel ? ' sel ' + cls : ''}" ${ro ? '' : 'onclick="setRisk(\'' + l + '\')"'}>${l}</div>`;
+          }).join('')}</div>
+          <div class="risk-meter">
+            <div class="risk-seg low ${cur ? 'active' : ''}"></div>
+            <div class="risk-seg med ${cur === 'Medium' || cur === 'High' ? 'active' : ''}"></div>
+            <div class="risk-seg high ${cur === 'High' ? 'active' : ''}"></div>
+          </div>`;
+        }
+
+        function setRisk(l) { state.data.riskLevel = l;
+            renderAll(); }
+
+        function setRadio(key, val) { state.data[key] = val;
+            renderAll(); }
+
+        // ---------- Verify section ----------
+        function verifySectionHTML(sec) {
+            return sec.items.map((label, i) => {
+                const v = state.data['verify_' + i];
+                const ro = isReadOnly();
+                return `<div class="verify-row">
+              <div class="verify-row-top">
+                <div><div class="verify-name">${label}</div></div>
+                <div class="chip-row">
+                  <div class="chip${v.status === 'verified' ? ' sel ok' : ''}" ${ro ? '' : `onclick="setVerify(${i},'verified')"`}>Verified</div>
+                  <div class="chip${v.status === 'not' ? ' sel bad' : ''}" ${ro ? '' : `onclick="setVerify(${i},'not')"`}>Not Verified</div>
+                  <div class="chip${v.status === 'issues' ? ' sel warn' : ''}" ${ro ? '' : `onclick="setVerify(${i},'issues')"`}>Issues Found</div>
+                </div>
+              </div>
+              <div class="verify-remarks ${v.status === 'issues' ? 'show' : ''}">
+                <input type="text" placeholder="Describe the issue found..." value="${escapeAttr(v.remarks)}" ${ro ? 'disabled' : ''} onchange="setVerifyRemarks(${i},this.value)">
+              </div>
+            </div>`;
+            }).join('');
+        }
+
+        function setVerify(i, status) { state.data['verify_' + i].status = status;
+            renderAll(); }
+
+        function setVerifyRemarks(i, val) { state.data['verify_' + i].remarks = val; }
+
+        // ---------- Image compression ----------
+        function compressImage(file, cb) {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const img = new Image();
+                img.onload = () => {
+                    const maxW = 480;
+                    const scale = Math.min(1, maxW / img.width);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    cb(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ---------- Section toggle ----------
+        function toggleSection(id) {
+            state.openSection = state.openSection === id ? null : id;
+            renderAll();
+        }
+
+        // ---------- Signature pad ----------
+        let sigCtx = null,
+            sigDrawing = false,
+            sigHasInk = false;
+
+        function initSignaturePad() {
+            const c = document.getElementById('sigCanvas');
+            if (!c) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = c.getBoundingClientRect();
+            c.width = rect.width * dpr;
+            c.height = rect.height * dpr;
+            sigCtx = c.getContext('2d');
+            sigCtx.scale(dpr, dpr);
+            sigCtx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--gold') || '#C4A672';
+            sigCtx.lineWidth = 2;
+            sigCtx.lineCap = 'round';
+            if (state.signature) {
+                const img = new Image();
+                img.onload = () => sigCtx.drawImage(img, 0, 0, rect.width, rect.height);
+                img.src = state.signature;
+            }
+            if (isReadOnly()) return;
+            const pos = e => {
+                const r = c.getBoundingClientRect();
+                const t = e.touches ? e.touches[0] : e;
+                return { x: t.clientX - r.left, y: t.clientY - r.top };
+            };
+            const start = e => { sigDrawing = true; const p = pos(e);
+                sigCtx.beginPath();
+                sigCtx.moveTo(p.x, p.y);
+                e.preventDefault(); };
+            const move = e => { if (!sigDrawing) return; const p = pos(e);
+                sigCtx.lineTo(p.x, p.y);
+                sigCtx.stroke();
+                sigHasInk = true;
+                e.preventDefault(); };
+            const end = () => { sigDrawing = false; };
+            c.addEventListener('mousedown', start);
+            c.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', end);
+            c.addEventListener('touchstart', start, { passive: false });
+            c.addEventListener('touchmove', move, { passive: false });
+            c.addEventListener('touchend', end);
+        }
+
+        function clearSig() {
+            const c = document.getElementById('sigCanvas');
+            if (!sigCtx) return;
+            sigCtx.clearRect(0, 0, c.width, c.height);
+            sigHasInk = false;
+            state.signature = null;
+        }
+
+        function saveSig() {
+            const c = document.getElementById('sigCanvas');
+            if (!sigHasInk) { toast('Draw your signature first'); return; }
+            state.signature = c.toDataURL('image/png');
+            toast('Signature saved');
+        }
+
+        // -------------------------------------------------------------
+        // RENDER: ACTION BAR
+        // -------------------------------------------------------------
+        function renderActionBar() {
+            const bar = document.getElementById('actionBar');
+            if (state.role === 'agent') {
+                bar.innerHTML = `<button class="btn btn-ghost" disabled>View only — Agent access</button>`;
+                return;
+            }
+            if (state.role === 'admin') {
+                if (state.status === 'submitted' || state.status === 'review') {
+                    bar.innerHTML = `
+                <button class="btn btn-bad" onclick="rejectReport()">Reject</button>
+                <button class="btn btn-ok" onclick="approveReport()">Approve</button>`;
+                } else if (state.status === 'approved') {
+                    bar.innerHTML = `<button class="btn btn-gold" onclick="exportPDF()">Export Bank-Ready PDF</button>`;
+                } else {
+                    bar.innerHTML =
+                        `<button class="btn btn-ghost" disabled>Awaiting submission from Legal Associate</button>`;
+                }
+                return;
+            }
+            // valuer
+            if (state.status === 'draft') {
+                bar.innerHTML = `
+              <button class="btn btn-ghost" onclick="saveDraft()">Save Draft</button>
+              <button class="btn btn-gold" onclick="submitReport()">Submit Report</button>`;
+            } else if (state.status === 'rejected') {
+                bar.innerHTML = `
+              <button class="btn btn-ghost" onclick="reopenDraft()">Revise & Reopen</button>
+              <button class="btn btn-gold" onclick="submitReport()">Resubmit</button>`;
+            } else {
+                bar.innerHTML = `<button class="btn btn-gold" onclick="exportPDF()">Export PDF Preview</button>`;
+            }
+        }
+
+        // -------------------------------------------------------------
+        // ACTIONS
+        // -------------------------------------------------------------
+        async function saveDraft() {
+            const ok = await syncReportToCloud(true);
+            toast(ok ? 'Saved as draft' : 'Save failed — check connection');
+        }
+
+        async function submitReport() {
+            submitAttempted = true;
+            const missing = getMissingRequired();
+            if (missing.length) {
+                renderAll();
+                document.getElementById('f_' + missing[0])?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                toast(`${missing.length} required field(s) missing`);
+                return;
+            }
+            state.status = 'submitted';
+            const ok = await syncReportToCloud(false);
+            toast(ok ? 'Report submitted for review' : 'Submitted locally — cloud save failed');
+            renderAll();
+        }
+
+        async function approveReport() { state.status = 'approved';
+            await syncReportToCloud(false);
+            toast('Report approved');
+            renderAll(); }
+
+        async function rejectReport() { state.status = 'rejected';
+            await syncReportToCloud(false);
+            toast('Report rejected — sent back to associate');
+            renderAll(); }
+
+        async function reopenDraft() { state.status = 'draft';
+            await syncReportToCloud(false);
+            renderAll(); }
+
+        function exportPDF() {
+            toast('Opening print dialog — choose "Save as PDF"');
+            setTimeout(() => window.print(), 400);
+        }
+
+        // -------------------------------------------------------------
+        // RENDER ALL
+        // -------------------------------------------------------------
+        function updateProgressOnly() {
+            document.getElementById('progressFill').style.width = pct() + '%';
+            document.getElementById('progressPct').textContent = pct() + '% complete';
+        }
+
+        function renderAll() {
+            const b = statusBadgeInfo();
+            const badgeEl = document.getElementById('statusBadge');
+            badgeEl.textContent = b[0];
+            badgeEl.className = 'badge ' + b[1];
+            document.getElementById('appNoLabel').textContent = state.data.loanAppNo || 'LN-2026-00842';
+            document.getElementById('progressFill').style.width = pct() + '%';
+            document.getElementById('progressPct').textContent = pct() + '% complete';
+            renderRail();
+            renderForm();
+            renderActionBar();
+        }
+
+        // -------------------------------------------------------------
+        // WIRING
+        // -------------------------------------------------------------
+        document.getElementById('themeToggle').onclick = () => {
+            const cur = document.body.getAttribute('data-theme');
+            document.body.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+        };
+
+        document.getElementById('roleSelect').onchange = e => {
+            state.role = e.target.value;
+            renderAll();
+        };
+
+        document.getElementById('appNoLabel').onclick = async () => {
+            const appNo = prompt('Enter Loan Application Number to load:', state.data.loanAppNo || '');
+            if (appNo && appNo.trim()) {
+                const loaded = await loadReportFromCloud(appNo.trim());
+                if (!loaded) { state.data.loanAppNo = appNo.trim();
+                    renderAll(); }
+            }
+        };
+
+        initReport();
+    </script>
 </body>
 </html>
