@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Technical Evaluation Report | Solitaire Finz Mart</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -997,17 +998,16 @@
         };
 
         // -------------------------------------------------------------
-        // SUPABASE CLOUD SYNC
+        // SUPABASE CLOUD SYNC (shared client from js/supabase-config.js)
         // -------------------------------------------------------------
-        const SUPABASE_URL = "https://nbpvamrwzqrgoiwpadwc.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_GrJ_9z_y903WFMGjoAg82Q_cG3N2_Jx";
-        const sb = (window.supabase && window.supabase.createClient)
-            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-            : null;
+        const sb = window.sb || null;
         const REPORT_TYPE = 'technical';
-        const MEDIA_BUCKET = 'evaluation-media';
+        const MEDIA_BUCKET = window.MEDIA_BUCKET || 'evaluation-media';
 
         async function uploadDataUrlToStorage(dataUrl, path, contentType) {
+            if (window.SFM && window.SFM.uploadDataUrlToStorage) {
+                return window.SFM.uploadDataUrlToStorage(dataUrl, path, contentType, MEDIA_BUCKET);
+            }
             try {
                 const res = await fetch(dataUrl);
                 const blob = await res.blob();
