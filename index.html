@@ -2212,6 +2212,7 @@
         </div>
       </div>
       <div class="header-actions">
+        <i class="fab fa-whatsapp" id="waHubIcon" title="WhatsApp Communication" style="color:#25D366; cursor:pointer;"></i>
         <i class="fas fa-search"></i>
         <i class="fas fa-sliders-h"></i>
         <i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i>
@@ -3316,6 +3317,24 @@
         if (el) el.textContent = text;
       }
 
+      // Supabase/Postgrest error objects don't stringify usefully with plain
+      // console.error/toString (shows up as "[object Object]" on some mobile
+      // consoles). This pulls out the actual reason so it's visible without
+      // needing devtools.
+      function describeSbError(err) {
+        if (!err) return 'Unknown error';
+        const parts = [];
+        if (err.message) parts.push(err.message);
+        if (err.code) parts.push('code: ' + err.code);
+        if (err.details) parts.push('details: ' + err.details);
+        if (err.hint) parts.push('hint: ' + err.hint);
+        if (err.status) parts.push('status: ' + err.status);
+        if (parts.length === 0) {
+          try { parts.push(JSON.stringify(err)); } catch (e) { parts.push(String(err)); }
+        }
+        return parts.join(' · ');
+      }
+
       function leadToRow(lead) {
         return {
           id: lead.id,
@@ -3421,8 +3440,8 @@
           if (firstError) throw firstError;
           setSyncStatus('☁️ Synced to cloud · ' + new Date().toLocaleTimeString());
         } catch (err) {
-          console.error('Supabase sync error:', err);
-          setSyncStatus('⚠️ Cloud sync failed — saved locally, will retry');
+          console.error('Supabase sync error:', describeSbError(err), err);
+          setSyncStatus('⚠️ Cloud sync failed — ' + describeSbError(err));
         } finally {
           syncInFlight = false;
           if (syncQueued) { syncQueued = false; syncToSupabase(); }
@@ -3487,8 +3506,8 @@
           setSyncStatus('☁️ Synced to cloud · ' + new Date().toLocaleTimeString());
           return true;
         } catch (err) {
-          console.error('Supabase load error:', err);
-          setSyncStatus('⚠️ Cloud unreachable — using local data');
+          console.error('Supabase load error:', describeSbError(err), err);
+          setSyncStatus('⚠️ Cloud unreachable — ' + describeSbError(err));
           return false;
         }
       }
@@ -5008,21 +5027,25 @@
                     <button class="stage-btn ack" data-action="approve" data-id="${lead.id}" ${!(lead.legalStatus === 'approved' && lead.technicalStatus === 'approved' && lead.legalSubmitted && lead.technicalSubmitted) ? 'disabled' : ''}>✅ Final</button>
                     <button class="stage-btn deny" data-action="deny" data-id="${lead.id}">❌</button>
                     <button class="stage-btn verification" data-action="bankTemplate" data-id="${lead.id}">🏦 Bank</button>
+                    <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : role === 'business' ? `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️</button>
                     <button class="stage-btn" data-action="edit" data-id="${lead.id}">✏️</button>
+                    <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : role === 'legal' ? `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
                     <button class="stage-btn verification" data-action="legalApprove" data-id="${lead.id}" ${isLegalSubmitted ? 'disabled' : ''}>⚖️ Approve</button>
                     <button class="stage-btn deny" data-action="legalDeny" data-id="${lead.id}" ${isLegalSubmitted ? 'disabled' : ''}>⚖️ Deny</button>
                     <button class="stage-btn ack" data-action="legalSubmit" data-id="${lead.id}" ${lead.legalStatus !== 'approved' ? 'disabled' : ''}>📤 Submit</button>
                     <button class="stage-btn" data-action="legalReport" data-id="${lead.id}" style="color:#6a9ad4;">📋 Report</button>
+                    <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : role === 'technical' ? `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
                     <button class="stage-btn verification" data-action="technicalApprove" data-id="${lead.id}" ${isTechnicalSubmitted ? 'disabled' : ''}>🔧 Approve</button>
                     <button class="stage-btn deny" data-action="technicalDeny" data-id="${lead.id}" ${isTechnicalSubmitted ? 'disabled' : ''}>🔧 Deny</button>
                     <button class="stage-btn ack" data-action="technicalSubmit" data-id="${lead.id}" ${lead.technicalStatus !== 'approved' ? 'disabled' : ''}>📤 Submit</button>
                     <button class="stage-btn" data-action="technicalReport" data-id="${lead.id}" style="color:#d4a86a;">📋 Report</button>
+                    <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
                   `}
@@ -5122,6 +5145,12 @@
           openLegalReport(lead);
         } else if (action === 'technicalReport') {
           openTechnicalReport(lead);
+        } else if (action === 'whatsapp') {
+          if (window.SFM_WA && typeof window.SFM_WA.openPanel === 'function') {
+            window.SFM_WA.openPanel(lead.id);
+          } else {
+            alert('WhatsApp module is still loading — please try again in a moment.');
+          }
         }
       });
 
@@ -6306,6 +6335,34 @@
       window.applyCibilScore = applyCibilScore;
       window.__persistAll = persistAll;
 
+      // ---- Bridge for whatsapp-module.js (read-only live accessors; does not
+      // change any existing behaviour) ----
+      window.__sfmBridge = {
+        getLeads: () => leads,
+        getLeadById: (id) => leads.find(l => l.id === (typeof id === 'string' ? parseInt(id) : id)),
+        getCurrentUser: () => currentUser,
+        getCurrentRole: () => currentRole,
+        getCurrentUserData: () => currentUserData,
+        getTeamMemberName: (id, type) => (typeof getTeamMemberName === 'function' ? getTeamMemberName(id, type) : id),
+        getTeamMemberMobile: (email, type) => {
+          try {
+            const arr = type === 'ba' ? businessAssociates : (type === 'legal' ? legalTeam : technicalTeam);
+            const m = arr.find(x => x.email === email);
+            return m ? (m.phone || '') : '';
+          } catch (e) { return ''; }
+        },
+        escapeHtml: (s) => (typeof escapeHtml === 'function' ? escapeHtml(s) : String(s == null ? '' : s)),
+        addFeed: (msg) => { if (typeof addFeed === 'function') addFeed(msg); },
+        sb: sb,
+        companyName: 'SOLITAIRE FINZ MART',
+        companyMobile: '8779023084'
+      };
+      document.getElementById('waHubIcon')?.addEventListener('click', function() {
+        if (window.SFM_WA && typeof window.SFM_WA.openHub === 'function') {
+          window.SFM_WA.openHub();
+        }
+      });
+
       setSyncStatus('⏳ Connecting to cloud…');
       loadFromSupabase().finally(() => {
         finishInit();
@@ -6326,6 +6383,9 @@
 
     })();
   </script>
+
+  <!-- WhatsApp Communication & Template Management System (additive module) -->
+  <script src="whatsapp-module.js"></script>
 
 </body>
 </html>
