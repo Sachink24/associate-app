@@ -3430,7 +3430,6 @@
         setSyncStatus('⏳ Syncing to cloud…');
         try {
           const jobs = [];
-          jobs.push(sb.from('users').upsert(usersToRows(users), { onConflict: 'email' }));
           if (leads.length) jobs.push(sb.from('leads').upsert(leads.map(leadToRow), { onConflict: 'id' }));
           if (businessAssociates.length) jobs.push(sb.from('business_associates').upsert(businessAssociates, { onConflict: 'email' }));
           if (legalTeam.length) jobs.push(sb.from('legal_team').upsert(legalTeam, { onConflict: 'email' }));
@@ -3462,21 +3461,21 @@
         if (!sb) { setSyncStatus('⚡ Offline mode · data stored in browser (localStorage)'); return false; }
         setSyncStatus('⏳ Connecting to cloud…');
         try {
-          const [leadsRes, usersRes, baRes, legalRes, techRes, feedRes, cibilRes] = await Promise.all([
+          const [leadsRes, baRes, legalRes, techRes, feedRes, cibilRes] = await Promise.all([
             sb.from('leads').select('*').order('id', { ascending: true }),
-            sb.from('users').select('*'),
             sb.from('business_associates').select('*').order('id', { ascending: true }),
             sb.from('legal_team').select('*').order('id', { ascending: true }),
             sb.from('technical_team').select('*').order('id', { ascending: true }),
             sb.from('feed_entries').select('*').order('time', { ascending: false }).limit(50),
             sb.from('cibil_scores').select('*').order('created_at', { ascending: false }).limit(1)
           ]);
-          const firstError = [leadsRes, usersRes, baRes, legalRes, techRes].map(r => r.error).find(Boolean);
+          // Note: 'users' is no longer fetched here. It requires an authenticated
+          // session (RLS), so it's loaded inside login() after sign-in instead.
+          const firstError = [leadsRes, baRes, legalRes, techRes].map(r => r.error).find(Boolean);
           if (firstError) throw firstError;
 
-          const cloudIsEmpty = !usersRes.data || usersRes.data.length === 0;
+          const cloudIsEmpty = !leadsRes.data || leadsRes.data.length === 0;
 
-          if (usersRes.data && usersRes.data.length) users = rowsToUsers(usersRes.data);
           if (baRes.data && baRes.data.length) businessAssociates = baRes.data;
           if (legalRes.data && legalRes.data.length) legalTeam = legalRes.data;
           if (techRes.data && techRes.data.length) technicalTeam = techRes.data;
@@ -3989,6 +3988,18 @@
       let currentUser = null;
       let currentRole = null;
       let currentUserData = null;
+      let inPasswordRecovery = false;
+
+      if (sb) {
+        sb.auth.onAuthStateChange((event) => {
+          if (event === 'PASSWORD_RECOVERY') {
+            inPasswordRecovery = true;
+            document.querySelector('#authToggle button[data-mode="signin"]').click();
+            resetPasswordBox.classList.add('show');
+            loginError.textContent = '🔑 Enter a new password below to finish resetting it.';
+          }
+        });
+      }
 
       document.querySelectorAll('#authToggle button').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -4019,26 +4030,33 @@
       cancelResetBtn.addEventListener('click', function() { resetPasswordBox.classList.remove('show'); });
 
       resetPasswordBtn.addEventListener('click', async function() {
-        const identifier = resetEmail.value.trim();
-        const newPass = resetNewPassword.value.trim();
-        const confirmPass = resetConfirmPassword.value.trim();
-        if (!identifier || !newPass || !confirmPass) { loginError.textContent = '⚠️ All fields are required.'; return; }
-        if (newPass.length < 6) { loginError.textContent = '⚠️ Password must be at least 6 characters.'; return; }
-        if (newPass !== confirmPass) { loginError.textContent = '⚠️ Passwords do not match.'; return; }
-        let foundUser = null,
-          foundKey = null;
-        for (const [key, user] of Object.entries(users)) {
-          if (key === identifier || user.mobile === identifier) { foundUser = user;
-            foundKey = key; break; }
+        if (inPasswordRecovery) {
+          const newPass = resetNewPassword.value.trim();
+          const confirmPass = resetConfirmPassword.value.trim();
+          if (!newPass || !confirmPass) { loginError.textContent = '⚠️ Enter and confirm your new password.'; return; }
+          if (newPass.length < 6) { loginError.textContent = '⚠️ Password must be at least 6 characters.'; return; }
+          if (newPass !== confirmPass) { loginError.textContent = '⚠️ Passwords do not match.'; return; }
+          const { error } = await sb.auth.updateUser({ password: newPass });
+          if (error) { loginError.textContent = '❌ Could not update password: ' + error.message; return; }
+          await sb.auth.signOut();
+          inPasswordRecovery = false;
+          loginError.textContent = '✅ Password updated! Please sign in with your new password.';
+          resetPasswordBox.classList.remove('show');
+          return;
         }
-        if (!foundUser) { loginError.textContent = '⚠️ No account found with this email or mobile number.'; return; }
-        users[foundKey].password = await makePasswordRecord(newPass);
-        persistAll();
-        loginError.textContent = '✅ Password reset successfully! Please sign in.';
+        const identifier = resetEmail.value.trim();
+        if (!identifier) { loginError.textContent = '⚠️ Enter your registered email address.'; return; }
+        if (!identifier.includes('@') || !sb) {
+          loginError.textContent = '⚠️ Password reset requires your registered email address. Contact admin if you only have a mobile login.';
+          return;
+        }
+        const { error } = await sb.auth.resetPasswordForEmail(identifier, { redirectTo: window.location.href });
+        if (error) {
+          loginError.textContent = '❌ Could not send reset email: ' + error.message;
+          return;
+        }
+        loginError.textContent = '✅ Reset link sent to ' + identifier + ' — check your inbox.';
         resetPasswordBox.classList.remove('show');
-        loginEmail.value = foundKey;
-        loginPassword.value = newPass;
-        document.querySelector('#authToggle button[data-mode="signin"]').click();
       });
 
       signupBtn.addEventListener('click', async function() {
@@ -4046,37 +4064,32 @@
         const email = signupEmail.value.trim().toLowerCase();
         const mobile = signupMobile.value.trim();
         const role = signupRole.value;
-        const password = signupPassword.value.trim();
-        if (!name || !email || !mobile || !password) { loginError.textContent =
-            '⚠️ All fields including mobile number are required.'; return; }
-        if (password.length < 6) { loginError.textContent = '⚠️ Password must be at least 6 characters.'; return; }
-        if (users[email]) { loginError.textContent = '⚠️ This email is already registered. Please sign in.'; return; }
+        if (!name || !email || !mobile) { loginError.textContent =
+            '⚠️ Please fill in your name, email and mobile number.'; return; }
+        // Self-service signup is currently disabled: a working login requires a
+        // paired Supabase Auth account, which can only be created by an admin.
+        // We record the request so an admin can create the account, rather than
+        // silently creating a local-only account that could never actually log in.
         let userRole;
         if (role === 'business') userRole = 'business';
         else if (role === 'legal') userRole = 'legal';
         else if (role === 'technical') userRole = 'technical';
         else userRole = 'customer';
-        const passwordRecord = await makePasswordRecord(password);
-        users[email] = { password: passwordRecord, role: userRole, name, mobile, status: 'pending' };
-        if (role === 'business') {
-          if (!businessAssociates.find(b => b.email === email)) {
-            businessAssociates.push({ id: businessAssociates.reduce((max, b) => Math.max(max, b.id), 0) + 1, name,
-              phone: mobile, email, status: 'pending' });
-          }
+        if (role === 'business' && !businessAssociates.find(b => b.email === email)) {
+          businessAssociates.push({ id: businessAssociates.reduce((max, b) => Math.max(max, b.id), 0) + 1, name,
+            phone: mobile, email, status: 'pending' });
         }
-        if (role === 'legal') {
+        if (role === 'legal' && !legalTeam.find(b => b.email === email)) {
           legalTeam.push({ id: legalTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email, phone: mobile,
             status: 'pending' });
         }
-        if (role === 'technical') {
+        if (role === 'technical' && !technicalTeam.find(b => b.email === email)) {
           technicalTeam.push({ id: technicalTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email,
             phone: mobile, status: 'pending' });
         }
         persistAll();
-        loginError.textContent = '✅ Account created successfully! ' + (role === 'legal' || role === 'technical' ?
-          'Waiting for admin approval.' : 'Please sign in.');
-        loginEmail.value = email;
-        loginPassword.value = password;
+        loginError.textContent = '✅ Request received! An admin will create your login and confirm with you directly — self-service sign-in isn\'t available yet.';
+        signupName.value = ''; signupEmail.value = ''; signupMobile.value = ''; signupPassword.value = '';
         document.querySelector('#authToggle button[data-mode="signin"]').click();
         updateTeamManagement();
         updateBASelector();
@@ -4087,38 +4100,74 @@
       async function login(identifier, password) {
         let foundUser = null,
           foundKey = null;
-        for (const [key, user] of Object.entries(users)) {
-          if (key === identifier || user.mobile === identifier) { foundUser = user;
-            foundKey = key; break; }
+
+        const looksLikeEmail = identifier.includes('@');
+
+        if (looksLikeEmail && sb) {
+          // Staff accounts (owner/admin/legal/technical) now authenticate via
+          // Supabase Auth, since the 'users' table requires a real session (RLS).
+          const { data: authData, error: authError } = await sb.auth.signInWithPassword({
+            email: identifier,
+            password: password
+          });
+          if (authError || !authData || !authData.user) {
+            loginError.textContent = '❌ Incorrect email or password.';
+            return false;
+          }
+          const { data: rows, error: rowError } = await sb
+            .from('users')
+            .select('*')
+            .eq('auth_user_id', authData.user.id)
+            .limit(1);
+          if (rowError || !rows || !rows.length) {
+            loginError.textContent = '❌ Account not fully set up. Contact admin.';
+            await sb.auth.signOut();
+            return false;
+          }
+          const row = rows[0];
+          foundKey = row.email;
+          foundUser = { password: row.password, role: row.role, name: row.name, mobile: row.mobile, status: row.status };
+          users[foundKey] = foundUser;
+        } else {
+          // Fallback: local/offline check (used only if Supabase is unreachable,
+          // or for a non-email identifier such as a mobile number)
+          for (const [key, user] of Object.entries(users)) {
+            if (key === identifier || user.mobile === identifier) { foundUser = user;
+              foundKey = key; break; }
+          }
+          if (!foundUser) {
+            loginError.textContent = '❌ No account found with this email or mobile number.';
+            return false;
+          }
+          const check = await verifyPasswordRecord(password, foundUser.password);
+          if (!check.ok) {
+            loginError.textContent = '❌ Incorrect password. Please try again.';
+            return false;
+          }
+          if (check.upgradedRecord) {
+            // Transparently upgrade legacy plaintext password to a hashed record
+            users[foundKey].password = check.upgradedRecord;
+          }
         }
-        if (!foundUser) {
-          loginError.textContent = '❌ No account found with this email or mobile number.';
-          return false;
-        }
-        const check = await verifyPasswordRecord(password, foundUser.password);
-        if (!check.ok) {
-          loginError.textContent = '❌ Incorrect password. Please try again.';
-          return false;
-        }
-        if (check.upgradedRecord) {
-          // Transparently upgrade legacy plaintext password to a hashed record
-          users[foundKey].password = check.upgradedRecord;
-          persistAll();
-        }
+
         if ((foundUser.role === 'legal' || foundUser.role === 'technical') && foundUser.status === 'pending') {
           loginError.textContent = '⏳ Your account is pending admin approval.';
+          if (sb) await sb.auth.signOut();
           return false;
         }
         if ((foundUser.role === 'legal' || foundUser.role === 'technical') && foundUser.status === 'terminated') {
           loginError.textContent = '❌ Your account has been terminated. Contact admin.';
+          if (sb) await sb.auth.signOut();
           return false;
         }
         if (foundUser.role === 'business' && foundUser.status === 'pending') {
           loginError.textContent = '⏳ Your business associate account is pending admin approval.';
+          if (sb) await sb.auth.signOut();
           return false;
         }
         if (foundUser.role === 'business' && foundUser.status === 'terminated') {
           loginError.textContent = '❌ Your business associate account has been terminated. Contact admin.';
+          if (sb) await sb.auth.signOut();
           return false;
         }
         currentUser = foundKey;
