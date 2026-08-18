@@ -709,7 +709,7 @@ We appreciate your trust. 🙏
 
       <div class="wa-field">
         <label>Preview / Edit Message</label>
-        <textarea class="wa-textarea" id="waMessageBox">${esc(rendered)}</textarea>
+        <textarea class="wa-textarea" id="waMessageBox"></textarea>
       </div>
 
       <div class="wa-note">Variables are filled automatically from this application's live data. You can edit the text above before sending — your edits are used exactly as typed.</div>
@@ -729,7 +729,9 @@ We appreciate your trust. 🙏
       editedMessage = null;
       renderPanel();
     };
-    document.getElementById("waMessageBox").oninput = (e) => { editedMessage = e.target.value; };
+    const waMessageBoxEl = document.getElementById("waMessageBox");
+    if (waMessageBoxEl) waMessageBoxEl.value = String(rendered == null ? "" : rendered);
+    waMessageBoxEl.oninput = (e) => { editedMessage = e.target.value; };
 
     document.getElementById("waCopyBtn").onclick = () => {
       const text = document.getElementById("waMessageBox").value;
