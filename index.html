@@ -3461,28 +3461,24 @@
         if (!sb) { setSyncStatus('⚡ Offline mode · data stored in browser (localStorage)'); return false; }
         setSyncStatus('⏳ Connecting to cloud…');
         try {
-          const [leadsRes, baRes, legalRes, techRes, feedRes, cibilRes] = await Promise.all([
-            sb.from('leads').select('*').order('id', { ascending: true }),
+          const [baRes, legalRes, techRes, feedRes, cibilRes] = await Promise.all([
             sb.from('business_associates').select('*').order('id', { ascending: true }),
             sb.from('legal_team').select('*').order('id', { ascending: true }),
             sb.from('technical_team').select('*').order('id', { ascending: true }),
             sb.from('feed_entries').select('*').order('time', { ascending: false }).limit(50),
             sb.from('cibil_scores').select('*').order('created_at', { ascending: false }).limit(1)
           ]);
-          // Note: 'users' is no longer fetched here. It requires an authenticated
-          // session (RLS), so it's loaded inside login() after sign-in instead.
-          const firstError = [leadsRes, baRes, legalRes, techRes].map(r => r.error).find(Boolean);
+          // Note: 'users' and 'leads' are no longer fetched here. Both now
+          // require an authenticated session (RLS). 'users' loads inside
+          // login(); 'leads' loads via loadLeadsFromSupabase() right after.
+          const firstError = [baRes, legalRes, techRes].map(r => r.error).find(Boolean);
           if (firstError) throw firstError;
 
-          const cloudIsEmpty = !leadsRes.data || leadsRes.data.length === 0;
+          const cloudIsEmpty = (!baRes.data || !baRes.data.length) && (!legalRes.data || !legalRes.data.length) && (!techRes.data || !techRes.data.length);
 
           if (baRes.data && baRes.data.length) businessAssociates = baRes.data;
           if (legalRes.data && legalRes.data.length) legalTeam = legalRes.data;
           if (techRes.data && techRes.data.length) technicalTeam = techRes.data;
-          if (leadsRes.data && leadsRes.data.length) {
-            leads = leadsRes.data.map(rowToLead);
-            nextId = Math.max(nextId, ...leads.map(l => l.id)) + 1;
-          }
           if (feedRes.data && feedRes.data.length) {
             feedEntries = feedRes.data.map(r => ({ time: new Date(r.time).toLocaleTimeString(), text: r.text }));
           }
@@ -3490,12 +3486,10 @@
             globalCibilScore = cibilRes.data[0].score;
           }
 
-          saveToStorage(STORAGE_KEYS.leads, leads);
           saveToStorage(STORAGE_KEYS.users, users);
           saveToStorage(STORAGE_KEYS.businessAssociates, businessAssociates);
           saveToStorage(STORAGE_KEYS.legalTeam, legalTeam);
           saveToStorage(STORAGE_KEYS.technicalTeam, technicalTeam);
-          saveToStorage(STORAGE_KEYS.nextId, nextId);
           saveToStorage(STORAGE_KEYS.feedEntries, feedEntries);
           saveToStorage(STORAGE_KEYS.cibilScore, globalCibilScore);
 
@@ -3509,6 +3503,22 @@
           setSyncStatus('⚠️ Cloud unreachable — ' + describeSbError(err));
           return false;
         }
+      }
+
+      async function loadLeadsFromSupabase() {
+        if (!sb) return false;
+        const { data, error } = await sb.from('leads').select('*').order('id', { ascending: true });
+        if (error) {
+          console.error('Leads load error:', describeSbError(error), error);
+          return false;
+        }
+        if (data && data.length) {
+          leads = data.map(rowToLead);
+          nextId = Math.max(nextId, ...leads.map(l => l.id)) + 1;
+          saveToStorage(STORAGE_KEYS.leads, leads);
+          saveToStorage(STORAGE_KEYS.nextId, nextId);
+        }
+        return true;
       }
 
       function subscribeToLeadChanges() {
@@ -4128,6 +4138,7 @@
           foundKey = row.email;
           foundUser = { password: row.password, role: row.role, name: row.name, mobile: row.mobile, status: row.status };
           users[foundKey] = foundUser;
+          await loadLeadsFromSupabase();
         } else {
           // Fallback: local/offline check (used only if Supabase is unreachable,
           // or for a non-email identifier such as a mobile number)
