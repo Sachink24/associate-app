@@ -6208,11 +6208,23 @@
             ${lead.technicalSubmitted ? `<div class="value" style="color:#d4a86a;">📤 Technical Submitted: ${new Date(lead.technicalSubmittedDate).toLocaleDateString()}</div>` : ''}
           </div>
           <div class="template-section">
+            <div class="label">💰 Credit / Sanction Terms</div>
+            <div class="value">Sanctioned Loan Amount: ₹${(lead.creditLoanAmount || 0).toLocaleString()}</div>
+            <div class="value">Term: ${lead.creditTermMonths ? lead.creditTermMonths + ' months' : 'N/A'}</div>
+            <div class="value">Rate of Interest (ROI): ${lead.creditROI ? lead.creditROI + '%' : 'N/A'}</div>
+            <div class="value">Fees: ${escapeHtml(lead.creditFees || 'N/A')}</div>
+            <div class="value">Conditions / Sanction Conditions: ${escapeHtml(lead.creditConditions || 'N/A')}</div>
+            <div class="value" style="color:${lead.creditStatus === 'approved' ? '#6ad49a' : lead.creditStatus === 'declined' ? '#d46a6a' : '#d4b86a'}">
+              Credit Status: ${lead.creditStatus === 'approved' ? '✅ Approved' : lead.creditStatus === 'declined' ? '❌ Declined' : '⏳ Pending'}
+            </div>
+            ${lead.creditSubmitted ? `<div class="value" style="color:#c9a84c;">📤 Credit Submitted: ${new Date(lead.creditSubmittedDate).toLocaleDateString()}</div>` : ''}
+          </div>
+          <div class="template-section">
             <div class="label">📊 Financial Ratios</div>
             <div class="value">DTI: ${lead.borrower.income > 0 ? ((lead.borrower.debt * 12 / lead.borrower.income) * 100).toFixed(1) : 'N/A'}%</div>
-            <div class="value">LTV: ${lead.property?.value > 0 ? ((lead.loanAmount / lead.property.value) * 100).toFixed(1) : 'N/A'}%</div>
+            <div class="value">LTV: ${lead.property?.value > 0 ? (((lead.creditLoanAmount || lead.loanAmount) / lead.property.value) * 100).toFixed(1) : 'N/A'}%</div>
             <div class="value">Credit Score Band: ${escapeHtml(lead.credit || 'N/A')}</div>
-            <div class="value">Max Loan Term: ${lead.borrower.retirementInfo?.maxTerm || 30} years</div>
+            <div class="value">Approved Loan Term: ${lead.creditTermMonths ? (lead.creditTermMonths / 12).toFixed(1) + ' years' : (lead.borrower.retirementInfo?.maxTerm || 30) + ' years (max eligible)'}</div>
           </div>
           <div class="template-section">
             <div class="label">📄 Documents Checklist</div>
