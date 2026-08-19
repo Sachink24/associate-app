@@ -1,136 +1,178 @@
-/* ============================================================
-   Solitaire Finz Mart — Shared Supabase Client
-   ------------------------------------------------------------
-   Include AFTER the Supabase JS CDN script on any page that
-   needs backend access:
+/* =====================================================================
+   SOLITAIRE — Shared Supabase Configuration
+   -----------------------------------------------------------------------
+   Used by: index.html, legal.html, technical.html, credit.html
+   Project: nbpvamrwzqrgoiwpadwc  (Solitaire Finz Mart)
+
+   Load this file AFTER the supabase-js CDN script and BEFORE your page's
+   own <script> block, e.g.:
 
      <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-     <script src="js/supabase-config.js"></script>
+     <script src="supabase-config.js"></script>
+     <script> ... page code that uses window.SolitaireDB ... </script>
 
-   This file creates ONE shared client on `window.sb` (and
-   `window.supabaseClient` as an alias) so every page — index.html,
-   legal.html, technical.html, privacy.html — talks to the same
-   Supabase project without re-declaring the URL/key each time.
-
-   Pages that don't need the backend (e.g. a purely static page)
-   can simply omit this <script> tag and nothing breaks.
-   ============================================================ */
+   Everything is namespaced under window.SolitaireDB so it can't collide
+   with each page's own `state`, `sb`, etc.
+   ===================================================================== */
 
 (function () {
-  "use strict";
+    const SUPABASE_URL = "https://nbpvamrwzqrgoiwpadwc.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_GrJ_9z_y903WFMGjoAg82Q_cG3N2_Jx";
 
-  const SUPABASE_URL = "https://nbpvamrwzqrgoiwpadwc.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_GrJ_9z_y903WFMGjoAg82Q_cG3N2_Jx";
+    const sb = (window.supabase && window.supabase.createClient)
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+        : null;
 
-  // Default private bucket used for evaluation report photos/signatures.
-  // Individual pages can override by setting window.MEDIA_BUCKET before
-  // this script runs, or just reference SFM.MEDIA_BUCKET directly.
-  const MEDIA_BUCKET = window.MEDIA_BUCKET || "evaluation-media";
+    const MEDIA_BUCKET = 'evaluation-media';
 
-  // Avoid re-initializing if this script is accidentally included twice.
-  if (window.sb && window.__sfmSupabaseReady) {
-    console.warn("[supabase-config] Client already initialized — skipping re-init.");
-    return;
-  }
+    /* -------------------------------------------------------------
+       LEADS  (associate-app "leads" table)
+       leads columns: id (bigint PK), borrower (jsonb), loan_type,
+       loan_amount, credit, institution_type, institution_name,
+       property (jsonb), co_applicants (jsonb[]), stage, ...
+       ------------------------------------------------------------- */
 
-  if (!window.supabase || typeof window.supabase.createClient !== "function") {
-    console.error(
-      "[supabase-config] Supabase JS SDK not found. Make sure the CDN script " +
-      "(@supabase/supabase-js@2) is included BEFORE js/supabase-config.js."
-    );
-    return;
-  }
+    // Search leads by numeric id or by borrower name (partial match).
+    async function searchLeads(term) {
+        if (!sb) return [];
+        term = (term || '').trim();
+        let query = sb.from('leads')
+            .select('id, borrower, loan_type, loan_amount, institution_name, property, stage, created_at')
+            .order('id', { ascending: false })
+            .limit(20);
 
-  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-  /**
-   * Upload a base64 data URL (e.g. a captured photo or signature) to Storage.
-   * @param {string} dataUrl - "data:image/jpeg;base64,...."
-   * @param {string} path - destination path inside the bucket, e.g. "legal/LN-2026-00842/photo_1.jpg"
-   * @param {string} contentType - e.g. "image/jpeg" or "image/png"
-   * @param {string} [bucket] - defaults to MEDIA_BUCKET
-   * @returns {Promise<boolean>} true on success
-   */
-  async function uploadDataUrlToStorage(dataUrl, path, contentType, bucket) {
-    try {
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const { error } = await client.storage
-        .from(bucket || MEDIA_BUCKET)
-        .upload(path, blob, { upsert: true, contentType });
-      if (error) {
-        console.error("[supabase-config] upload error:", error);
-        return false;
-      }
-      return true;
-    } catch (err) {
-      console.error("[supabase-config] upload exception:", err);
-      return false;
+        if (term) {
+            if (/^\d+$/.test(term)) {
+                query = sb.from('leads')
+                    .select('id, borrower, loan_type, loan_amount, institution_name, property, stage, created_at')
+                    .eq('id', Number(term));
+            } else {
+                query = query.ilike('borrower->>name', `%${term}%`);
+            }
+        }
+        const { data, error } = await query;
+        if (error) { console.error('SolitaireDB.searchLeads error:', error); return []; }
+        return data || [];
     }
-  }
 
-  /**
-   * Get a temporary signed URL for a private storage object.
-   * @param {string} path
-   * @param {number} [expiresInSeconds=3600]
-   * @param {string} [bucket] - defaults to MEDIA_BUCKET
-   * @returns {Promise<string|null>}
-   */
-  async function getSignedUrl(path, expiresInSeconds, bucket) {
-    if (!path) return null;
-    try {
-      const { data, error } = await client.storage
-        .from(bucket || MEDIA_BUCKET)
-        .createSignedUrl(path, expiresInSeconds || 3600);
-      if (error) {
-        console.error("[supabase-config] signed URL error:", error);
-        return null;
-      }
-      return data ? data.signedUrl : null;
-    } catch (err) {
-      console.error("[supabase-config] signed URL exception:", err);
-      return null;
+    // Fetch a single lead row by its numeric id.
+    async function getLeadById(id) {
+        if (!sb || id === null || id === undefined || id === '') return null;
+        const { data, error } = await sb.from('leads').select('*').eq('id', Number(id)).maybeSingle();
+        if (error) { console.error('SolitaireDB.getLeadById error:', error); return null; }
+        return data;
     }
-  }
 
-  /**
-   * Generic upsert helper for evaluation_reports-style tables.
-   * @param {string} table
-   * @param {object} row
-   * @param {string} onConflict - e.g. "report_type,loan_app_no"
-   */
-  async function upsertRow(table, row, onConflict) {
-    return client.from(table).upsert(row, { onConflict });
-  }
-
-  /**
-   * Generic single-row fetch helper.
-   * @param {string} table
-   * @param {object} matchObj - e.g. { report_type: 'legal', loan_app_no: 'LN-2026-00842' }
-   */
-  async function fetchRow(table, matchObj) {
-    let query = client.from(table).select("*");
-    for (const key in matchObj) {
-      query = query.eq(key, matchObj[key]);
+    // Canonical loan application number derived from a lead's numeric id.
+    // Kept as its own function so every page generates the SAME app no.
+    function loanAppNoForLead(lead) {
+        return 'LN-' + lead.id;
     }
-    return query.maybeSingle();
-  }
 
-  // Expose on window so existing inline scripts (which reference `sb`)
-  // keep working with zero code changes beyond removing their own
-  // duplicate createClient() call.
-  window.sb = client;
-  window.supabaseClient = client;
-  window.MEDIA_BUCKET = MEDIA_BUCKET;
+    // Human-readable one-line label for a lead, e.g. for a picker dropdown.
+    function leadLabel(lead) {
+        const b = lead.borrower || {};
+        const bits = ['#' + lead.id, b.name || 'Unnamed', lead.loan_type || ''].filter(Boolean);
+        return bits.join(' — ');
+    }
 
-  window.SFM = window.SFM || {};
-  window.SFM.supabase = client;
-  window.SFM.uploadDataUrlToStorage = uploadDataUrlToStorage;
-  window.SFM.getSignedUrl = getSignedUrl;
-  window.SFM.upsertRow = upsertRow;
-  window.SFM.fetchRow = fetchRow;
+    // Best-known mapping of a lender's short/free-text name in `leads`
+    // to the exact option strings used in the Legal/Technical dropdowns.
+    const BANK_ALIASES = {
+        'ICICI': 'ICICI Bank',
+        'AXIS': 'Axis Bank',
+        'SBI': 'State Bank of India',
+        'STATE BANK': 'State Bank of India',
+        'PNB': 'PNB Housing',
+        'HDFC': 'HDFC Ltd',
+        'PIRAMAL': 'Piramal Finance',
+        'GODREJ': 'Godrej Capital',
+        'SHRIRAM': 'Shriram Finance',
+        'TATA': 'Tata Capital',
+        'IIFL': 'IIFL Finance'
+    };
 
-  window.__sfmSupabaseReady = true;
+    function normalizeBankName(raw) {
+        const up = (raw || '').toUpperCase();
+        for (const key in BANK_ALIASES) {
+            if (up.includes(key)) return BANK_ALIASES[key];
+        }
+        return '';
+    }
 
-  console.log("[supabase-config] Solitaire Finz Mart Supabase client ready.");
+    // Converts a `leads` row into the flat field shape the Legal /
+    // Technical report forms expect (state.data). Only fills fields that
+    // exist on the lead — anything unknown is left for the user to fill.
+    function mapLeadToReportData(lead) {
+        if (!lead) return {};
+        const b = lead.borrower || {};
+        const p = lead.property || {};
+        const co = Array.isArray(lead.co_applicants) ? lead.co_applicants : [];
+
+        const borrowerNames = [b.name, ...co.map(c => (c.name ? c.name + ' (Co-Applicant)' : null))]
+            .filter(Boolean).join(', ');
+
+        const propertyAddress = [p.address, p.city, p.state, p.pincode]
+            .filter(Boolean).join(', ');
+
+        return {
+            loanAppNo: loanAppNoForLead(lead),
+            borrowers: borrowerNames,
+            propertyAddress: propertyAddress,
+            reportDate: new Date().toISOString().slice(0, 10),
+            bankName: normalizeBankName(lead.institution_name),
+            loanType: lead.loan_type || '',
+            requestedLoanAmount: lead.loan_amount || '',
+            cibilScore: b.cibilScore || '',
+            __leadId: lead.id,
+            __rawLead: lead   // kept in case a page wants deeper fields (docs, valuation, etc.)
+        };
+    }
+
+    /* -------------------------------------------------------------
+       EVALUATION REPORTS  (evaluation_reports table)
+       columns: report_type ('legal'|'technical'), loan_app_no, status,
+       data (jsonb), gps, signature_path, updated_by, ...
+       ------------------------------------------------------------- */
+
+    async function loadReportFromCloud(reportType, appNo) {
+        if (!sb || !appNo) return null;
+        const { data, error } = await sb.from('evaluation_reports').select('*')
+            .eq('report_type', reportType).eq('loan_app_no', appNo).maybeSingle();
+        if (error) { console.error('SolitaireDB.loadReportFromCloud error:', error); return null; }
+        return data;
+    }
+
+    async function saveReportToCloud(payload) {
+        if (!sb) return { error: { message: 'Supabase client not available' } };
+        const { error } = await sb.from('evaluation_reports')
+            .upsert(payload, { onConflict: 'report_type,loan_app_no' });
+        if (error) console.error('SolitaireDB.saveReportToCloud error:', error);
+        return { error };
+    }
+
+    async function uploadDataUrlToStorage(dataUrl, path, contentType) {
+        if (!sb) return false;
+        try {
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const { error } = await sb.storage.from(MEDIA_BUCKET).upload(path, blob, { upsert: true, contentType });
+            return !error;
+        } catch (err) { console.error('SolitaireDB.uploadDataUrlToStorage error:', err); return false; }
+    }
+
+    async function signedUrlFor(path, expiresSeconds) {
+        if (!sb || !path) return null;
+        const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(path, expiresSeconds || 3600);
+        if (error) { console.error('SolitaireDB.signedUrlFor error:', error); return null; }
+        return data ? data.signedUrl : null;
+    }
+
+    window.SolitaireDB = {
+        sb, SUPABASE_URL, SUPABASE_KEY, MEDIA_BUCKET,
+        // leads
+        searchLeads, getLeadById, loanAppNoForLead, leadLabel, mapLeadToReportData,
+        // evaluation_reports
+        loadReportFromCloud, saveReportToCloud, uploadDataUrlToStorage, signedUrlFor
+    };
 })();
