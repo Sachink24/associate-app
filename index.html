@@ -2133,11 +2133,11 @@
         <div id="signinForm">
           <div class="form-group">
             <label>Email or Mobile Number</label>
-            <input type="text" id="loginEmail" placeholder="Enter email or mobile number" value="sachinkale241981@gmail.com">
+            <input type="text" id="loginEmail" placeholder="Enter email or mobile number">
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="loginPassword" placeholder="Enter your password" value="Password@123">
+            <input type="password" id="loginPassword" placeholder="Enter your password">
           </div>
           <div class="forgot-link" id="forgotPasswordLink">Forgot password?</div>
           <button class="btn-primary" id="loginBtn"><i class="fas fa-sign-in-alt"></i> Sign In</button>
@@ -2214,8 +2214,33 @@
       <div class="header-actions">
         <i class="fab fa-whatsapp" id="waHubIcon" title="WhatsApp Communication" style="color:#25D366; cursor:pointer;"></i>
         <i class="fas fa-search"></i>
+        <i class="fas fa-key" id="changePasswordIcon" title="Change Password" style="color:#c9a84c; cursor:pointer;"></i>
         <i class="fas fa-sliders-h"></i>
         <i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i>
+      </div>
+    </div>
+
+    <!-- CHANGE PASSWORD (self-service, for logged-in users incl. those on a temp password) -->
+    <div class="share-overlay" id="changePasswordOverlay">
+      <div class="share-card">
+        <div class="header">
+          <h2><i class="fas fa-key"></i> Change Password</h2>
+          <button class="close-btn" id="closeChangePasswordBtn">&times;</button>
+        </div>
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="cpCurrentPassword" placeholder="Enter your current / temp password">
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="cpNewPassword" placeholder="New password (min 6 chars)">
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="cpConfirmPassword" placeholder="Confirm new password">
+        </div>
+        <button class="btn-primary" id="cpSubmitBtn" style="margin-top:4px; width:100%;"><i class="fas fa-check"></i> Update Password</button>
+        <div class="login-error" id="cpError"></div>
       </div>
     </div>
 
@@ -3623,14 +3648,21 @@
       // 2. INITIALIZE DATA
       // ================================================================
       let leads = loadFromStorage(STORAGE_KEYS.leads, []);
+      // NOTE: this seed is a local/offline fallback only, used when Supabase Auth is
+      // unreachable (see login()). Staff accounts authenticate via Supabase Auth in
+      // normal operation, so these are NOT live credentials — they exist purely so
+      // the app has something to check against if the network is down. No real
+      // password should ever be committed here; if any of the emails below are still
+      // using 'Password@123' as their actual Supabase Auth password, rotate it via
+      // the in-app Change Password option.
       let users = loadFromStorage(STORAGE_KEYS.users, {
-        'sachinkale241981@gmail.com': { password: 'Password@123', role: 'owner', name: 'Admin', mobile: '8779023084',
+        'sachinkale241981@gmail.com': { password: 'CHANGE_ME_OFFLINE_FALLBACK', role: 'owner', name: 'Admin', mobile: '8779023084',
           status: 'active' },
-        'sachin.kale@solitairefinserves.com': { password: 'Password@123', role: 'business', name: 'Demo Associates',
+        'sachin.kale@solitairefinserves.com': { password: 'CHANGE_ME_OFFLINE_FALLBACK', role: 'business', name: 'Demo Associates',
           mobile: '7738807163', status: 'active' },
-        'admin.legal@gmail.com': { password: 'Password@123', role: 'legal', name: 'Adv. Meera Sharma',
+        'admin.legal@gmail.com': { password: 'CHANGE_ME_OFFLINE_FALLBACK', role: 'legal', name: 'Adv. Meera Sharma',
           mobile: '8779023084', status: 'active' },
-        'admin.technical@gmail.com': { password: 'Password@123', role: 'technical', name: 'Er. Suresh Iyer',
+        'admin.technical@gmail.com': { password: 'CHANGE_ME_OFFLINE_FALLBACK', role: 'technical', name: 'Er. Suresh Iyer',
           mobile: '8779023084', status: 'active' }
       });
       let businessAssociates = loadFromStorage(STORAGE_KEYS.businessAssociates, [
@@ -4223,6 +4255,96 @@
         updateUIForRole();
         updateAllCardAccess();
         updateRoleAccessBadge();
+      });
+
+      // ================================================================
+      // 6b. CHANGE PASSWORD (self-service, for logged-in users)
+      // ================================================================
+      const changePasswordIcon = document.getElementById('changePasswordIcon');
+      const changePasswordOverlay = document.getElementById('changePasswordOverlay');
+      const closeChangePasswordBtn = document.getElementById('closeChangePasswordBtn');
+      const cpCurrentPassword = document.getElementById('cpCurrentPassword');
+      const cpNewPassword = document.getElementById('cpNewPassword');
+      const cpConfirmPassword = document.getElementById('cpConfirmPassword');
+      const cpSubmitBtn = document.getElementById('cpSubmitBtn');
+      const cpError = document.getElementById('cpError');
+
+      function openChangePasswordModal() {
+        if (!currentUser) {
+          loginError.textContent = '⚠️ Please sign in first.';
+          return;
+        }
+        cpCurrentPassword.value = '';
+        cpNewPassword.value = '';
+        cpConfirmPassword.value = '';
+        cpError.textContent = '';
+        cpError.style.color = '#d46a6a';
+        changePasswordOverlay.classList.add('show');
+      }
+      function closeChangePasswordModal() {
+        changePasswordOverlay.classList.remove('show');
+      }
+      changePasswordIcon.addEventListener('click', openChangePasswordModal);
+      closeChangePasswordBtn.addEventListener('click', closeChangePasswordModal);
+      changePasswordOverlay.addEventListener('click', function(e) {
+        if (e.target === changePasswordOverlay) closeChangePasswordModal();
+      });
+
+      cpSubmitBtn.addEventListener('click', async function() {
+        cpError.style.color = '#d46a6a';
+        const currentPass = cpCurrentPassword.value.trim();
+        const newPass = cpNewPassword.value.trim();
+        const confirmPass = cpConfirmPassword.value.trim();
+
+        if (!currentPass || !newPass || !confirmPass) {
+          cpError.textContent = '⚠️ Please fill in all fields.';
+          return;
+        }
+        if (newPass.length < 6) {
+          cpError.textContent = '⚠️ New password must be at least 6 characters.';
+          return;
+        }
+        if (newPass !== confirmPass) {
+          cpError.textContent = '⚠️ New passwords do not match.';
+          return;
+        }
+        if (newPass === currentPass) {
+          cpError.textContent = '⚠️ New password must be different from the current password.';
+          return;
+        }
+        if (!sb) {
+          cpError.textContent = '❌ Cloud connection unavailable. Try again later.';
+          return;
+        }
+
+        cpSubmitBtn.disabled = true;
+        try {
+          // Re-verify identity with the current/temp password before allowing the change.
+          const { data: sessionData } = await sb.auth.getUser();
+          const email = sessionData && sessionData.user ? sessionData.user.email : (currentUser && currentUser.includes('@') ? currentUser : null);
+          if (!email) {
+            cpError.textContent = '❌ Could not verify your account. Please log out and back in, then retry.';
+            return;
+          }
+          const { error: reauthError } = await sb.auth.signInWithPassword({ email, password: currentPass });
+          if (reauthError) {
+            cpError.textContent = '❌ Current password is incorrect.';
+            return;
+          }
+          const { error: updateError } = await sb.auth.updateUser({ password: newPass });
+          if (updateError) {
+            cpError.textContent = '❌ Could not update password: ' + updateError.message;
+            return;
+          }
+          cpError.style.color = '#6ad49a';
+          cpError.textContent = '✅ Password updated successfully!';
+          addFeed(`🔑 ${currentUserData ? currentUserData.name : currentUser} changed their password`);
+          setTimeout(closeChangePasswordModal, 1500);
+        } catch (err) {
+          cpError.textContent = '❌ Unexpected error: ' + err.message;
+        } finally {
+          cpSubmitBtn.disabled = false;
+        }
       });
 
       // ================================================================
