@@ -46,6 +46,8 @@
     "Legal Submitted": "Legal Verification",
     "Technical Approved": "Technical Verification",
     "Technical Submitted": "Technical Verification",
+    "Credit Approved": "Credit Verification",
+    "Credit Submitted": "Credit Verification",
     "Ready for Admin Approval": "Sanction",
     "Approved": "Sanction"
   };
@@ -159,11 +161,15 @@ Dear {{customer_name}},
 
 Congratulations!
 
-Your loan application has progressed to the Sanction stage.
+Your loan application has been sanctioned.
 
 📋 Application ID: {{application_id}}
 🏦 Institution: {{bank_name}}
-💰 Loan Amount: ₹{{loan_amount}}
+💰 Sanctioned Amount: ₹{{sanctioned_amount}}
+📅 Tenure: {{tenure}}
+📈 Rate of Interest: {{roi}}
+💳 Fees: {{fees}}
+📝 Conditions: {{sanction_conditions}}
 
 📌 Status: {{application_status}}
 
@@ -171,6 +177,28 @@ Our team will contact you regarding the remaining formalities.
 
 Thank you for trusting SOLITAIRE FINZ MART.
 
+📞 {{company_mobile}}`
+    },
+    {
+      template_name: "Credit Verification", category: "Sanction", application_stage: "Credit Submitted", status: "active",
+      message_content:
+`💰 SOLITAIRE FINZ MART
+
+Dear {{customer_name}},
+
+Your application {{application_id}} has moved to the Credit / Sanction Terms stage.
+
+Our credit team has reviewed your file and finalized the terms:
+
+📌 Current Stage: Credit Verification
+💰 Loan Amount: ₹{{sanctioned_amount}}
+📅 Tenure: {{tenure}}
+📈 ROI: {{roi}}
+
+Final approval is pending admin sign-off.
+
+Regards,
+SOLITAIRE FINZ MART
 📞 {{company_mobile}}`
     },
     {
@@ -184,7 +212,9 @@ Your loan application {{application_id}} is now at the Documentation stage.
 
 Please complete the required documentation/formalities to proceed towards disbursement.
 
-💰 Loan Amount: ₹{{loan_amount}}
+💰 Sanctioned Amount: ₹{{sanctioned_amount}}
+📅 Tenure: {{tenure}}
+📈 ROI: {{roi}}
 🏦 Institution: {{bank_name}}
 
 For assistance:
@@ -205,7 +235,9 @@ Congratulations!
 Your loan application {{application_id}} has successfully reached the Disbursement stage.
 
 🏦 Institution: {{bank_name}}
-💰 Disbursed Amount: ₹{{loan_amount}}
+💰 Disbursed Amount: ₹{{sanctioned_amount}}
+📅 Tenure: {{tenure}}
+📈 ROI: {{roi}}
 
 Thank you for choosing SOLITAIRE FINZ MART.
 
@@ -410,6 +442,7 @@ We appreciate your trust. 🙏
     if (r === "business") return !!settingsCache.allow_associates;
     if (r === "legal") return !!settingsCache.allow_legal_team;
     if (r === "technical") return !!settingsCache.allow_technical_team;
+    if (r === "credit") return !!settingsCache.allow_credit_team;
     return false; // customer / guest cannot send
   }
   function canManageTemplates() { return isAdmin(); }
@@ -421,6 +454,7 @@ We appreciate your trust. 🙏
     if (r === "owner" || r === "business") return active;
     if (r === "legal") return active.filter(t => t.category === "Legal" || t.category === "General" || t.category === "Lead");
     if (r === "technical") return active.filter(t => t.category === "Technical" || t.category === "General" || t.category === "Lead");
+    if (r === "credit") return active.filter(t => t.category === "Sanction" || t.category === "General" || t.category === "Lead");
     return [];
   }
 
@@ -451,7 +485,7 @@ We appreciate your trust. 🙏
     const currentUserData = b ? b.getCurrentUserData() : null;
     const currentUser = b ? b.getCurrentUser() : null;
     const associateEmail = lead.assignedBA || currentUser || "";
-    const associateType = lead.assignedBA ? "ba" : (role() === "legal" ? "legal" : (role() === "technical" ? "technical" : "ba"));
+    const associateType = lead.assignedBA ? "ba" : (role() === "legal" ? "legal" : (role() === "technical" ? "technical" : (role() === "credit" ? "credit" : "ba")));
     const associateName = lead.assignedBA
       ? b.getTeamMemberName(lead.assignedBA, "ba")
       : (currentUserData ? currentUserData.name : "SOLITAIRE Team");
@@ -467,7 +501,12 @@ We appreciate your trust. 🙏
       loan_type: lead.loanType || "N/A",
       bank_name: lead.institutionName || "Not Selected",
       current_stage: lead.stage || "New",
-      application_status: lead.adminStatus || lead.legalStatus || lead.technicalStatus || "Pending",
+      application_status: lead.adminStatus || lead.creditStatus || lead.legalStatus || lead.technicalStatus || "Pending",
+      sanctioned_amount: fmtINR(lead.creditLoanAmount || lead.loanAmount),
+      roi: lead.creditROI ? (lead.creditROI + "%") : "To be confirmed",
+      tenure: lead.creditTermMonths ? (lead.creditTermMonths + " months") : "To be confirmed",
+      fees: lead.creditFees || "To be confirmed",
+      sanction_conditions: lead.creditConditions || "None",
       associate_name: associateName || "SOLITAIRE Team",
       associate_mobile: associateMobile || b.companyMobile,
       company_name: b.companyName,
@@ -483,9 +522,10 @@ We appreciate your trust. 🙏
       "New": "Document collection",
       "Contacted": "Document collection",
       "Document Collection": "KYC verification",
-      "Underwriting": "Legal & Technical evaluation",
-      "Legal Submitted": "Technical evaluation",
-      "Technical Submitted": "Final admin approval",
+      "Underwriting": "Legal, Technical & Credit evaluation",
+      "Legal Submitted": "Technical & Credit evaluation",
+      "Technical Submitted": "Credit evaluation",
+      "Credit Submitted": "Final admin approval",
       "Ready for Admin Approval": "Final admin approval",
       "Approved": "Documentation & disbursement",
       "Declined": "N/A"
