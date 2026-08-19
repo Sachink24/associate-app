@@ -2163,6 +2163,7 @@
               <option value="business">Business Associate</option>
               <option value="legal">Legal Associate</option>
               <option value="technical">Technical Associate</option>
+              <option value="credit">Credit Associate</option>
               <option value="customer">Customer</option>
             </select>
           </div>
@@ -3077,7 +3078,7 @@
 
           <!-- ASSIGN LEGAL & TECHNICAL TEAM - ADMIN ONLY -->
           <div id="teamAssignmentSection" style="display:none;">
-            <div class="card-title" style="margin-top:8px;"><i class="fas fa-users-cog"></i> Assign Legal & Technical Team</div>
+            <div class="card-title" style="margin-top:8px;"><i class="fas fa-users-cog"></i> Assign Legal, Technical & Credit Team</div>
             <div class="assignment-selector">
               <div class="assignment-label"><i class="fas fa-gavel"></i> Legal Associate</div>
               <select id="assignLegal">
@@ -3098,6 +3099,17 @@
                 <i class="fas fa-user-check"></i>
                 <span>Assigned Technical: <strong id="assignedTechnicalName">-</strong></span>
                 <span class="role-badge technical-badge">TECHNICAL</span>
+              </div>
+            </div>
+            <div class="assignment-selector">
+              <div class="assignment-label"><i class="fas fa-rupee-sign"></i> Credit Associate</div>
+              <select id="assignCredit">
+                <option value="">Select Credit Associate...</option>
+              </select>
+              <div id="assignedCreditDisplay" class="assigned-to-display" style="display:none;">
+                <i class="fas fa-user-check"></i>
+                <span>Assigned Credit: <strong id="assignedCreditName">-</strong></span>
+                <span class="role-badge" style="background:#2a2410; color:#c9a84c; border:1px solid rgba(201,168,76,0.35);">CREDIT</span>
               </div>
             </div>
           </div>
@@ -3279,6 +3291,7 @@
         users: 'solitaire_users',
         legalTeam: 'solitaire_legalTeam',
         technicalTeam: 'solitaire_technicalTeam',
+        creditTeam: 'solitaire_creditTeam',
         businessAssociates: 'solitaire_businessAssociates',
         nextId: 'solitaire_nextId',
         feedEntries: 'solitaire_feedEntries',
@@ -3374,6 +3387,7 @@
           assigned_ba: lead.assignedBA || null,
           assigned_legal: lead.assignedLegal || null,
           assigned_technical: lead.assignedTechnical || null,
+          assigned_credit: lead.assignedCredit || null,
           bt_top_up_data: lead.btTopUpData || null,
           property: lead.property || {},
           verification_status: lead.verificationStatus || 'pending',
@@ -3381,11 +3395,25 @@
           kyc_status: lead.kycStatus || 'pending',
           legal_status: lead.legalStatus || 'pending',
           technical_status: lead.technicalStatus || 'pending',
+          credit_status: lead.creditStatus || 'pending',
           admin_status: lead.adminStatus || 'pending',
           legal_submitted: !!lead.legalSubmitted,
           technical_submitted: !!lead.technicalSubmitted,
+          credit_submitted: !!lead.creditSubmitted,
           legal_submitted_date: lead.legalSubmittedDate || null,
           technical_submitted_date: lead.technicalSubmittedDate || null,
+          credit_submitted_date: lead.creditSubmittedDate || null,
+          credit_loan_amount: lead.creditLoanAmount || null,
+          credit_term_months: lead.creditTermMonths || null,
+          credit_roi: lead.creditROI || null,
+          credit_fees: lead.creditFees || null,
+          credit_conditions: lead.creditConditions || null,
+          credit_observation: lead.creditObservation || null,
+          credit_recommendation: lead.creditRecommendation || null,
+          legal_observation: lead.legalObservation || null,
+          legal_recommendation: lead.legalRecommendation || null,
+          technical_observation: lead.technicalObservation || null,
+          technical_recommendation: lead.technicalRecommendation || null,
           stage: lead.stage || 'New',
           created_at: lead.createdAt || new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -3407,6 +3435,7 @@
           assignedBA: row.assigned_ba,
           assignedLegal: row.assigned_legal,
           assignedTechnical: row.assigned_technical,
+          assignedCredit: row.assigned_credit,
           btTopUpData: row.bt_top_up_data,
           property: row.property || {},
           verificationStatus: row.verification_status,
@@ -3414,11 +3443,25 @@
           kycStatus: row.kyc_status,
           legalStatus: row.legal_status,
           technicalStatus: row.technical_status,
+          creditStatus: row.credit_status,
           adminStatus: row.admin_status,
           legalSubmitted: !!row.legal_submitted,
           technicalSubmitted: !!row.technical_submitted,
+          creditSubmitted: !!row.credit_submitted,
           legalSubmittedDate: row.legal_submitted_date,
           technicalSubmittedDate: row.technical_submitted_date,
+          creditSubmittedDate: row.credit_submitted_date,
+          creditLoanAmount: row.credit_loan_amount,
+          creditTermMonths: row.credit_term_months,
+          creditROI: row.credit_roi,
+          creditFees: row.credit_fees,
+          creditConditions: row.credit_conditions,
+          creditObservation: row.credit_observation,
+          creditRecommendation: row.credit_recommendation,
+          legalObservation: row.legal_observation,
+          legalRecommendation: row.legal_recommendation,
+          technicalObservation: row.technical_observation,
+          technicalRecommendation: row.technical_recommendation,
           stage: row.stage,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -3459,6 +3502,7 @@
           if (businessAssociates.length) jobs.push(sb.from('business_associates').upsert(businessAssociates, { onConflict: 'email' }));
           if (legalTeam.length) jobs.push(sb.from('legal_team').upsert(legalTeam, { onConflict: 'email' }));
           if (technicalTeam.length) jobs.push(sb.from('technical_team').upsert(technicalTeam, { onConflict: 'email' }));
+          if (creditTeam.length) jobs.push(sb.from('credit_team').upsert(creditTeam, { onConflict: 'email' }));
           const results = await Promise.all(jobs);
           const firstError = results.map(r => r.error).find(Boolean);
           if (firstError) throw firstError;
@@ -3486,24 +3530,26 @@
         if (!sb) { setSyncStatus('⚡ Offline mode · data stored in browser (localStorage)'); return false; }
         setSyncStatus('⏳ Connecting to cloud…');
         try {
-          const [baRes, legalRes, techRes, feedRes, cibilRes] = await Promise.all([
+          const [baRes, legalRes, techRes, creditRes, feedRes, cibilRes] = await Promise.all([
             sb.from('business_associates').select('*').order('id', { ascending: true }),
             sb.from('legal_team').select('*').order('id', { ascending: true }),
             sb.from('technical_team').select('*').order('id', { ascending: true }),
+            sb.from('credit_team').select('*').order('id', { ascending: true }),
             sb.from('feed_entries').select('*').order('time', { ascending: false }).limit(50),
             sb.from('cibil_scores').select('*').order('created_at', { ascending: false }).limit(1)
           ]);
           // Note: 'users' and 'leads' are no longer fetched here. Both now
           // require an authenticated session (RLS). 'users' loads inside
           // login(); 'leads' loads via loadLeadsFromSupabase() right after.
-          const firstError = [baRes, legalRes, techRes].map(r => r.error).find(Boolean);
+          const firstError = [baRes, legalRes, techRes, creditRes].map(r => r.error).find(Boolean);
           if (firstError) throw firstError;
 
-          const cloudIsEmpty = (!baRes.data || !baRes.data.length) && (!legalRes.data || !legalRes.data.length) && (!techRes.data || !techRes.data.length);
+          const cloudIsEmpty = (!baRes.data || !baRes.data.length) && (!legalRes.data || !legalRes.data.length) && (!techRes.data || !techRes.data.length) && (!creditRes.data || !creditRes.data.length);
 
           if (baRes.data && baRes.data.length) businessAssociates = baRes.data;
           if (legalRes.data && legalRes.data.length) legalTeam = legalRes.data;
           if (techRes.data && techRes.data.length) technicalTeam = techRes.data;
+          if (creditRes.data && creditRes.data.length) creditTeam = creditRes.data;
           if (feedRes.data && feedRes.data.length) {
             feedEntries = feedRes.data.map(r => ({ time: new Date(r.time).toLocaleTimeString(), text: r.text }));
           }
@@ -3515,6 +3561,7 @@
           saveToStorage(STORAGE_KEYS.businessAssociates, businessAssociates);
           saveToStorage(STORAGE_KEYS.legalTeam, legalTeam);
           saveToStorage(STORAGE_KEYS.technicalTeam, technicalTeam);
+          saveToStorage(STORAGE_KEYS.creditTeam, creditTeam);
           saveToStorage(STORAGE_KEYS.feedEntries, feedEntries);
           saveToStorage(STORAGE_KEYS.cibilScore, globalCibilScore);
 
@@ -3682,6 +3729,9 @@
         { id: 2, name: 'Er. Priya Nair', email: 'priya.tech@solitaire.in', phone: '+91 87654 32115',
           status: 'pending' }
       ]);
+      let creditTeam = loadFromStorage(STORAGE_KEYS.creditTeam, [
+        { id: 1, name: 'Credit Admin', email: 'admin.credit@gmail.com', phone: '8779023084', status: 'active' }
+      ]);
       let nextId = loadFromStorage(STORAGE_KEYS.nextId, 1000);
       let feedEntries = loadFromStorage(STORAGE_KEYS.feedEntries, []);
       let globalCibilScore = loadFromStorage(STORAGE_KEYS.cibilScore, 750);
@@ -3692,6 +3742,7 @@
         saveToStorage(STORAGE_KEYS.businessAssociates, businessAssociates);
         saveToStorage(STORAGE_KEYS.legalTeam, legalTeam);
         saveToStorage(STORAGE_KEYS.technicalTeam, technicalTeam);
+        saveToStorage(STORAGE_KEYS.creditTeam, creditTeam);
         saveToStorage(STORAGE_KEYS.nextId, nextId);
         saveToStorage(STORAGE_KEYS.feedEntries, feedEntries);
         saveToStorage(STORAGE_KEYS.cibilScore, globalCibilScore);
@@ -3812,7 +3863,7 @@
           const ba = businessAssociates.find(b => b.email === email);
           return ba ? ba.name : email.split('@')[0];
         }
-        const arr = team === 'legal' ? legalTeam : technicalTeam;
+        const arr = team === 'legal' ? legalTeam : team === 'credit' ? creditTeam : technicalTeam;
         const member = arr.find(m => m.email === email);
         return member ? member.name : email.split('@')[0];
       }
@@ -4116,6 +4167,7 @@
         if (role === 'business') userRole = 'business';
         else if (role === 'legal') userRole = 'legal';
         else if (role === 'technical') userRole = 'technical';
+        else if (role === 'credit') userRole = 'credit';
         else userRole = 'customer';
         if (role === 'business' && !businessAssociates.find(b => b.email === email)) {
           businessAssociates.push({ id: businessAssociates.reduce((max, b) => Math.max(max, b.id), 0) + 1, name,
@@ -4129,6 +4181,10 @@
           technicalTeam.push({ id: technicalTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email,
             phone: mobile, status: 'pending' });
         }
+        if (role === 'credit' && !creditTeam.find(b => b.email === email)) {
+          creditTeam.push({ id: creditTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email,
+            phone: mobile, status: 'pending' });
+        }
         persistAll();
         loginError.textContent = '✅ Request received! An admin will create your login and confirm with you directly — self-service sign-in isn\'t available yet.';
         signupName.value = ''; signupEmail.value = ''; signupMobile.value = ''; signupPassword.value = '';
@@ -4137,6 +4193,7 @@
         updateBASelector();
         updateLegalSelector();
         updateTechnicalSelector();
+        updateCreditSelector();
       });
 
       async function login(identifier, password) {
@@ -4193,12 +4250,12 @@
           }
         }
 
-        if ((foundUser.role === 'legal' || foundUser.role === 'technical') && foundUser.status === 'pending') {
+        if ((foundUser.role === 'legal' || foundUser.role === 'technical' || foundUser.role === 'credit') && foundUser.status === 'pending') {
           loginError.textContent = '⏳ Your account is pending admin approval.';
           if (sb) await sb.auth.signOut();
           return false;
         }
-        if ((foundUser.role === 'legal' || foundUser.role === 'technical') && foundUser.status === 'terminated') {
+        if ((foundUser.role === 'legal' || foundUser.role === 'technical' || foundUser.role === 'credit') && foundUser.status === 'terminated') {
           loginError.textContent = '❌ Your account has been terminated. Contact admin.';
           if (sb) await sb.auth.signOut();
           return false;
@@ -4223,6 +4280,7 @@
         updateBASelector();
         updateLegalSelector();
         updateTechnicalSelector();
+        updateCreditSelector();
         updateAllCardAccess();
         updateAutoAssignBA();
         updateRoleAccessBadge();
@@ -4603,6 +4661,21 @@
         if (current && active.some(a => a.email === current)) select.value = current;
       }
 
+      function updateCreditSelector() {
+        const select = document.getElementById('assignCredit');
+        if (!select) return;
+        const current = select.value;
+        select.innerHTML = '<option value="">Select Credit Associate...</option>';
+        const active = creditTeam.filter(m => m.status === 'active');
+        active.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.email;
+          opt.textContent = `${m.name} (${m.email})`;
+          select.appendChild(opt);
+        });
+        if (current && active.some(a => a.email === current)) select.value = current;
+      }
+
       function updateInstitutionSelect() {
         const type = document.getElementById('institutionTypeSelect').value;
         const select = document.getElementById('specificInstitutionSelect');
@@ -4644,6 +4717,10 @@
               <h4 style="color:#d4a86a; font-size:13px; margin-bottom:6px;"><i class="fas fa-tools"></i> Technical Team</h4>
               <div id="technicalTeamList"></div>
             </div>
+            <div style="margin-top:12px;">
+              <h4 style="color:#c9a84c; font-size:13px; margin-bottom:6px;"><i class="fas fa-rupee-sign"></i> Credit Team</h4>
+              <div id="creditTeamList"></div>
+            </div>
           `;
           pipelineScreen.insertBefore(card, pipelineScreen.querySelector('.card:last-child'));
           teamSection = card;
@@ -4654,55 +4731,38 @@
       function renderTeamLists(container) {
         const legalList = container.querySelector('#legalTeamList');
         const technicalList = container.querySelector('#technicalTeamList');
-        if (!legalList || !technicalList) return;
+        const creditList = container.querySelector('#creditTeamList');
+        if (!legalList || !technicalList || !creditList) return;
 
-        legalList.innerHTML = legalTeam.map((member, index) => `
-          <div class="team-card" data-team="legal" data-idx="${index}">
-            <div class="team-header">
-              <div>
-                <span class="team-name">${escapeHtml(member.name)}</span>
-                <span style="font-size:11px; color:#6a5f48; margin-left:6px;">${escapeHtml(member.email)}</span>
+        function teamCardsHtml(team, teamKey) {
+          return team.map((member, index) => `
+            <div class="team-card" data-team="${teamKey}" data-idx="${index}">
+              <div class="team-header">
+                <div>
+                  <span class="team-name">${escapeHtml(member.name)}</span>
+                  <span style="font-size:11px; color:#6a5f48; margin-left:6px;">${escapeHtml(member.email)}</span>
+                </div>
+                <span class="team-status ${member.status === 'active' ? 'badge-active' : member.status === 'terminated' ? 'badge-terminated' : 'badge-pending'}">
+                  ${member.status === 'active' ? '✅ Active' : member.status === 'terminated' ? '❌ Terminated' : '⏳ Pending'}
+                </span>
               </div>
-              <span class="team-status ${member.status === 'active' ? 'badge-active' : member.status === 'terminated' ? 'badge-terminated' : 'badge-pending'}">
-                ${member.status === 'active' ? '✅ Active' : member.status === 'terminated' ? '❌ Terminated' : '⏳ Pending'}
-              </span>
+              <div class="team-actions" style="margin-top:8px;">
+                ${member.status === 'pending' ? `
+                  <button class="btn-activate" data-action="approve"><i class="fas fa-check"></i> Approve</button>
+                  <button class="btn-terminate" data-action="deny"><i class="fas fa-times"></i> Deny</button>
+                ` : member.status === 'active' ? `
+                  <button class="btn-terminate" data-action="terminate"><i class="fas fa-ban"></i> Terminate</button>
+                ` : `
+                  <button class="btn-activate" data-action="reactivate"><i class="fas fa-undo"></i> Reactivate</button>
+                `}
+              </div>
             </div>
-            <div class="team-actions" style="margin-top:8px;">
-              ${member.status === 'pending' ? `
-                <button class="btn-activate" data-action="approve"><i class="fas fa-check"></i> Approve</button>
-                <button class="btn-terminate" data-action="deny"><i class="fas fa-times"></i> Deny</button>
-              ` : member.status === 'active' ? `
-                <button class="btn-terminate" data-action="terminate"><i class="fas fa-ban"></i> Terminate</button>
-              ` : `
-                <button class="btn-activate" data-action="reactivate"><i class="fas fa-undo"></i> Reactivate</button>
-              `}
-            </div>
-          </div>
-        `).join('');
+          `).join('');
+        }
 
-        technicalList.innerHTML = technicalTeam.map((member, index) => `
-          <div class="team-card" data-team="technical" data-idx="${index}">
-            <div class="team-header">
-              <div>
-                <span class="team-name">${escapeHtml(member.name)}</span>
-                <span style="font-size:11px; color:#6a5f48; margin-left:6px;">${escapeHtml(member.email)}</span>
-              </div>
-              <span class="team-status ${member.status === 'active' ? 'badge-active' : member.status === 'terminated' ? 'badge-terminated' : 'badge-pending'}">
-                ${member.status === 'active' ? '✅ Active' : member.status === 'terminated' ? '❌ Terminated' : '⏳ Pending'}
-              </span>
-            </div>
-            <div class="team-actions" style="margin-top:8px;">
-              ${member.status === 'pending' ? `
-                <button class="btn-activate" data-action="approve"><i class="fas fa-check"></i> Approve</button>
-                <button class="btn-terminate" data-action="deny"><i class="fas fa-times"></i> Deny</button>
-              ` : member.status === 'active' ? `
-                <button class="btn-terminate" data-action="terminate"><i class="fas fa-ban"></i> Terminate</button>
-              ` : `
-                <button class="btn-activate" data-action="reactivate"><i class="fas fa-undo"></i> Reactivate</button>
-              `}
-            </div>
-          </div>
-        `).join('');
+        legalList.innerHTML = teamCardsHtml(legalTeam, 'legal');
+        technicalList.innerHTML = teamCardsHtml(technicalTeam, 'technical');
+        creditList.innerHTML = teamCardsHtml(creditTeam, 'credit');
       }
 
       document.getElementById('screen-pipeline')?.addEventListener('click', function(e) {
@@ -4718,7 +4778,7 @@
       });
 
       function handleTeamAction(team, idx, action) {
-        const teamArray = team === 'legal' ? legalTeam : technicalTeam;
+        const teamArray = team === 'legal' ? legalTeam : team === 'credit' ? creditTeam : technicalTeam;
         const member = teamArray[idx];
         if (!member) return;
         const userEmail = member.email;
@@ -4932,6 +4992,7 @@
         }
         let assignedLegal = document.getElementById('assignLegal')?.value || '';
         let assignedTechnical = document.getElementById('assignTechnical')?.value || '';
+        let assignedCredit = document.getElementById('assignCredit')?.value || '';
 
         let btTopUpData = null;
         if (loanType === 'Balance Transfer + Top Up') {
@@ -5048,6 +5109,7 @@
           assignedBA,
           assignedLegal,
           assignedTechnical,
+          assignedCredit,
           btTopUpData,
           property: propertyData,
           verificationStatus: 'pending',
@@ -5055,11 +5117,25 @@
           kycStatus: 'pending',
           legalStatus: 'pending',
           technicalStatus: 'pending',
+          creditStatus: 'pending',
           adminStatus: 'pending',
           legalSubmitted: false,
           technicalSubmitted: false,
+          creditSubmitted: false,
           legalSubmittedDate: null,
           technicalSubmittedDate: null,
+          creditSubmittedDate: null,
+          creditLoanAmount: null,
+          creditTermMonths: null,
+          creditROI: null,
+          creditFees: '',
+          creditConditions: '',
+          creditObservation: '',
+          creditRecommendation: '',
+          legalObservation: '',
+          legalRecommendation: '',
+          technicalObservation: '',
+          technicalRecommendation: '',
           stage: leadStatus,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -5163,6 +5239,7 @@
         else if (role === 'business') filteredLeads = leads.filter(l => l.assignedBA === currentUser);
         else if (role === 'legal') filteredLeads = leads.filter(l => l.assignedLegal === currentUser);
         else if (role === 'technical') filteredLeads = leads.filter(l => l.assignedTechnical === currentUser);
+        else if (role === 'credit') filteredLeads = leads.filter(l => l.assignedCredit === currentUser);
         else if (role === 'customer') {
           const phone = currentUserData?.mobile;
           filteredLeads = leads.filter(l => l.borrower.phone === phone || l.borrower.email === currentUser);
@@ -5195,10 +5272,13 @@
                 ${isBT ? `<div style="font-size:9px; color:#d4a86a;">🔄 BT + Top Up</div>` : ''}
                 ${lead.assignedLegal ? `<div style="font-size:9px; color:#6a9ad4;">⚖️ Legal: ${escapeHtml(getTeamMemberName(lead.assignedLegal, 'legal'))}</div>` : ''}
                 ${lead.assignedTechnical ? `<div style="font-size:9px; color:#d4a86a;">🔧 Technical: ${escapeHtml(getTeamMemberName(lead.assignedTechnical, 'technical'))}</div>` : ''}
+                ${lead.assignedCredit ? `<div style="font-size:9px; color:#c9a84c;">💰 Credit: ${escapeHtml(getTeamMemberName(lead.assignedCredit, 'credit'))}</div>` : ''}
                 ${lead.legalStatus === 'approved' ? `<span style="font-size:8px; color:#6ad49a;">⚖️ Legal ✅</span>` : lead.legalStatus === 'declined' ? `<span style="font-size:8px; color:#d46a6a;">⚖️ Legal ❌</span>` : ''}
                 ${lead.technicalStatus === 'approved' ? `<span style="font-size:8px; color:#6ad49a;">🔧 Tech ✅</span>` : lead.technicalStatus === 'declined' ? `<span style="font-size:8px; color:#d46a6a;">🔧 Tech ❌</span>` : ''}
+                ${lead.creditStatus === 'approved' ? `<span style="font-size:8px; color:#6ad49a;">💰 Credit ✅</span>` : lead.creditStatus === 'declined' ? `<span style="font-size:8px; color:#d46a6a;">💰 Credit ❌</span>` : ''}
                 ${isLegalSubmitted ? `<span style="font-size:8px; color:#6a9ad4;">📤 Legal Submitted</span>` : ''}
                 ${isTechnicalSubmitted ? `<span style="font-size:8px; color:#d4a86a;">📤 Tech Submitted</span>` : ''}
+                ${lead.creditSubmitted ? `<span style="font-size:8px; color:#c9a84c;">📤 Credit Submitted</span>` : ''}
               </div>
               <div style="text-align:right;">
                 <span class="badge ${badgeClass}" style="font-size:10px;">${escapeHtml(stage)}</span>
@@ -5206,7 +5286,7 @@
                   ${role === 'owner' ? `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️</button>
                     <button class="stage-btn" data-action="edit" data-id="${lead.id}">✏️</button>
-                    <button class="stage-btn ack" data-action="approve" data-id="${lead.id}" ${!(lead.legalStatus === 'approved' && lead.technicalStatus === 'approved' && lead.legalSubmitted && lead.technicalSubmitted) ? 'disabled' : ''}>✅ Final</button>
+                    <button class="stage-btn ack" data-action="approve" data-id="${lead.id}" ${!(lead.legalStatus === 'approved' && lead.technicalStatus === 'approved' && lead.creditStatus === 'approved' && lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) ? 'disabled' : ''}>✅ Final</button>
                     <button class="stage-btn deny" data-action="deny" data-id="${lead.id}">❌</button>
                     <button class="stage-btn verification" data-action="bankTemplate" data-id="${lead.id}">🏦 Bank</button>
                     <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
@@ -5227,6 +5307,13 @@
                     <button class="stage-btn deny" data-action="technicalDeny" data-id="${lead.id}" ${isTechnicalSubmitted ? 'disabled' : ''}>🔧 Deny</button>
                     <button class="stage-btn ack" data-action="technicalSubmit" data-id="${lead.id}" ${lead.technicalStatus !== 'approved' ? 'disabled' : ''}>📤 Submit</button>
                     <button class="stage-btn" data-action="technicalReport" data-id="${lead.id}" style="color:#d4a86a;">📋 Report</button>
+                    <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
+                  ` : role === 'credit' ? `
+                    <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
+                    <button class="stage-btn verification" data-action="creditApprove" data-id="${lead.id}" ${lead.creditSubmitted ? 'disabled' : ''}>💰 Approve</button>
+                    <button class="stage-btn deny" data-action="creditDeny" data-id="${lead.id}" ${lead.creditSubmitted ? 'disabled' : ''}>💰 Deny</button>
+                    <button class="stage-btn ack" data-action="creditSubmit" data-id="${lead.id}" ${lead.creditStatus !== 'approved' ? 'disabled' : ''}>📤 Submit</button>
+                    <button class="stage-btn" data-action="creditReport" data-id="${lead.id}" style="color:#c9a84c;">📋 Sanction Terms</button>
                     <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
@@ -5252,8 +5339,8 @@
         if (action === 'view') showDetail(lead);
         else if (action === 'edit') editLead(lead);
         else if (action === 'approve') {
-          if (lead.legalStatus === 'approved' && lead.technicalStatus === 'approved' && lead.legalSubmitted && lead
-            .technicalSubmitted) {
+          if (lead.legalStatus === 'approved' && lead.technicalStatus === 'approved' && lead.creditStatus === 'approved' && lead
+            .legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
             lead.stage = 'Approved';
             lead.adminStatus = 'approved';
             addFeed(`✅ Lead ${lead.borrower.name} fully approved by Admin`);
@@ -5261,7 +5348,7 @@
             renderPipeline();
             openBankTemplate(lead);
           } else {
-            alert('⚠️ Both Legal and Technical teams must approve and submit before final Admin approval.');
+            alert('⚠️ Legal, Technical and Credit teams must all approve and submit before final Admin approval.');
           }
         } else if (action === 'deny') {
           if (confirm(`Are you sure you want to decline ${lead.borrower.name}'s application?`)) {
@@ -5289,6 +5376,10 @@
             lead.legalSubmittedDate = new Date().toISOString();
             lead.stage = 'Legal Submitted';
             addFeed(`📤 Legal submitted for ${lead.borrower.name}`);
+            if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
+              lead.stage = 'Ready for Admin Approval';
+              addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
+            }
             persistAll();
             renderPipeline();
           } else {
@@ -5312,7 +5403,34 @@
             lead.technicalSubmittedDate = new Date().toISOString();
             lead.stage = 'Technical Submitted';
             addFeed(`📤 Technical submitted for ${lead.borrower.name}`);
-            if (lead.legalSubmitted && lead.technicalSubmitted) {
+            if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
+              lead.stage = 'Ready for Admin Approval';
+              addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
+            }
+            persistAll();
+            renderPipeline();
+          } else {
+            alert('⚠️ Please approve the lead first before submitting.');
+          }
+        } else if (action === 'creditApprove') {
+          lead.creditStatus = 'approved';
+          lead.stage = 'Credit Approved';
+          addFeed(`💰 Credit approved for ${lead.borrower.name}`);
+          persistAll();
+          renderPipeline();
+        } else if (action === 'creditDeny') {
+          lead.creditStatus = 'declined';
+          lead.stage = 'Credit Declined';
+          addFeed(`💰 Credit declined for ${lead.borrower.name}`);
+          persistAll();
+          renderPipeline();
+        } else if (action === 'creditSubmit') {
+          if (lead.creditStatus === 'approved' && !lead.creditSubmitted) {
+            lead.creditSubmitted = true;
+            lead.creditSubmittedDate = new Date().toISOString();
+            lead.stage = 'Credit Submitted';
+            addFeed(`📤 Credit terms submitted for ${lead.borrower.name}`);
+            if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
               lead.stage = 'Ready for Admin Approval';
               addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
             }
@@ -5327,6 +5445,8 @@
           openLegalReport(lead);
         } else if (action === 'technicalReport') {
           openTechnicalReport(lead);
+        } else if (action === 'creditReport') {
+          openCreditReport(lead);
         } else if (action === 'whatsapp') {
           if (window.SFM_WA && typeof window.SFM_WA.openPanel === 'function') {
             window.SFM_WA.openPanel(lead.id);
@@ -5342,6 +5462,7 @@
       function openLegalReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
+        const editable = currentRole === 'legal' && !lead.legalSubmitted;
         detailView.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-weight:600; color:#6a9ad4;">⚖️ Legal Evaluation Report</span>
@@ -5355,18 +5476,37 @@
             <div class="report-section"><div class="report-label">Title Status</div><div class="report-value">${escapeHtml(lead.property?.titleStatus || 'N/A')}</div></div>
             <div class="report-section"><div class="report-label">Encumbrance</div><div class="report-value">${escapeHtml(lead.property?.encumbrance || 'N/A')}</div></div>
             <div class="report-section"><div class="report-label">Legal Remarks</div><div class="report-value">${escapeHtml(lead.property?.legalRemarks || 'N/A')}</div></div>
+            <div class="form-group">
+              <label>Legal Observation</label>
+              <textarea id="legalObservationInput" placeholder="Title search findings, encumbrance details, court case checks, litigation history, etc." ${editable ? '' : 'disabled'}>${escapeHtml(lead.legalObservation || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Legal Recommendation</label>
+              <textarea id="legalRecommendationInput" placeholder="Your recommendation to Admin — proceed, proceed with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.legalRecommendation || '')}</textarea>
+            </div>
+            ${editable ? `<button class="btn-secondary btn-sm" onclick="legalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button>` : ''}
             ${lead.legalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#6a9ad4;">✅ ${new Date(lead.legalSubmittedDate).toLocaleDateString()}</div></div>` : ''}
             <div class="report-actions">
               ${currentRole === 'legal' && lead.legalStatus !== 'approved' && !lead.legalSubmitted ? `<button class="btn-approve" onclick="legalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="legalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
-              ${currentRole === 'legal' && lead.legalStatus === 'approved' && !lead.legalSubmitted ? `<button class="btn-submit" onclick="legalQuickSubmit(${lead.id})">📤 Submit</button>` : ''}
+              ${currentRole === 'legal' && lead.legalStatus === 'approved' && !lead.legalSubmitted ? `<button class="btn-submit" onclick="legalQuickSubmit(${lead.id})">📤 Submit to Admin</button>` : ''}
             </div>
           </div>
         `;
       }
 
+      window.legalSaveNotes = function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (!lead) return;
+        lead.legalObservation = document.getElementById('legalObservationInput')?.value.trim() || '';
+        lead.legalRecommendation = document.getElementById('legalRecommendationInput')?.value.trim() || '';
+        addFeed(`📝 Legal notes saved for ${lead.borrower.name}`);
+        persistAll();
+      };
+
       function openTechnicalReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
+        const editable = currentRole === 'technical' && !lead.technicalSubmitted;
         detailView.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-weight:600; color:#d4a86a;">🔧 Technical Evaluation Report</span>
@@ -5381,14 +5521,133 @@
             <div class="report-section"><div class="report-label">Built-up Area</div><div class="report-value">${lead.property?.builtArea || 0} sq.ft.</div></div>
             <div class="report-section"><div class="report-label">Valuation</div><div class="report-value">₹${(lead.property?.value || 0).toLocaleString()}</div></div>
             <div class="report-section"><div class="report-label">Valuation Remarks</div><div class="report-value">${escapeHtml(lead.property?.valuationRemarks || 'N/A')}</div></div>
+            <div class="form-group">
+              <label>Technical Observation</label>
+              <textarea id="technicalObservationInput" placeholder="Site visit findings, construction quality, structural condition, approvals/sanctioned plan match, etc." ${editable ? '' : 'disabled'}>${escapeHtml(lead.technicalObservation || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Technical Recommendation</label>
+              <textarea id="technicalRecommendationInput" placeholder="Your recommendation to Admin — proceed, proceed with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.technicalRecommendation || '')}</textarea>
+            </div>
+            ${editable ? `<button class="btn-secondary btn-sm" onclick="technicalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button>` : ''}
             ${lead.technicalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#d4a86a;">✅ ${new Date(lead.technicalSubmittedDate).toLocaleDateString()}</div></div>` : ''}
             <div class="report-actions">
               ${currentRole === 'technical' && lead.technicalStatus !== 'approved' && !lead.technicalSubmitted ? `<button class="btn-approve" onclick="technicalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="technicalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
-              ${currentRole === 'technical' && lead.technicalStatus === 'approved' && !lead.technicalSubmitted ? `<button class="btn-submit" onclick="technicalQuickSubmit(${lead.id})">📤 Submit</button>` : ''}
+              ${currentRole === 'technical' && lead.technicalStatus === 'approved' && !lead.technicalSubmitted ? `<button class="btn-submit" onclick="technicalQuickSubmit(${lead.id})">📤 Submit to Admin</button>` : ''}
             </div>
           </div>
         `;
       }
+
+      window.technicalSaveNotes = function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (!lead) return;
+        lead.technicalObservation = document.getElementById('technicalObservationInput')?.value.trim() || '';
+        lead.technicalRecommendation = document.getElementById('technicalRecommendationInput')?.value.trim() || '';
+        addFeed(`📝 Technical notes saved for ${lead.borrower.name}`);
+        persistAll();
+      };
+
+      function openCreditReport(lead) {
+        const detailView = document.getElementById('detailView');
+        detailView.style.display = 'block';
+        const editable = currentRole === 'credit' && !lead.creditSubmitted;
+        detailView.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:600; color:#c9a84c;">💰 Credit / Sanction Terms</span>
+            <span class="badge" style="background:#2a2410; color:#c9a84c; border:1px solid rgba(201,168,76,0.35);">Credit</span>
+          </div>
+          <div class="report-embed">
+            <div class="report-section"><div class="report-label">Borrower</div><div class="report-value">${escapeHtml(lead.borrower.name)}</div></div>
+            <div class="report-section"><div class="report-label">CIBIL Score</div><div class="report-value">${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})</div></div>
+            <div class="report-section"><div class="report-label">Requested Loan Amount</div><div class="report-value">₹${(lead.loanAmount || 0).toLocaleString()}</div></div>
+            <div class="report-section"><div class="report-label">Credit Status</div><div class="report-value"><span class="badge ${lead.creditStatus === 'approved' ? 'badge-approved' : lead.creditStatus === 'declined' ? 'badge-declined' : 'badge-pending'}">${lead.creditStatus || 'Pending'}</span></div></div>
+            <div class="form-group">
+              <label>Sanctioned Loan Amount (₹)</label>
+              <input type="number" id="creditLoanAmountInput" placeholder="e.g. 5000000" value="${lead.creditLoanAmount || ''}" ${editable ? '' : 'disabled'}>
+            </div>
+            <div class="form-group">
+              <label>Term (months)</label>
+              <input type="number" id="creditTermInput" placeholder="e.g. 240" value="${lead.creditTermMonths || ''}" ${editable ? '' : 'disabled'}>
+            </div>
+            <div class="form-group">
+              <label>Rate of Interest (ROI %)</label>
+              <input type="number" step="0.01" id="creditROIInput" placeholder="e.g. 9.25" value="${lead.creditROI || ''}" ${editable ? '' : 'disabled'}>
+            </div>
+            <div class="form-group">
+              <label>Fees</label>
+              <input type="text" id="creditFeesInput" placeholder="e.g. Processing fee 0.5% + GST" value="${escapeHtml(lead.creditFees || '')}" ${editable ? '' : 'disabled'}>
+            </div>
+            <div class="form-group">
+              <label>Conditions / Sanction Conditions</label>
+              <textarea id="creditConditionsInput" placeholder="Any pre/post-disbursement conditions, security/collateral requirements, insurance, guarantor requirements, etc." ${editable ? '' : 'disabled'}>${escapeHtml(lead.creditConditions || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Credit Observation</label>
+              <textarea id="creditObservationInput" placeholder="FOIR, DTI, income assessment, banking analysis, risk notes, etc." ${editable ? '' : 'disabled'}>${escapeHtml(lead.creditObservation || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Credit Recommendation</label>
+              <textarea id="creditRecommendationInput" placeholder="Your recommendation to Admin — sanction, sanction with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.creditRecommendation || '')}</textarea>
+            </div>
+            ${editable ? `<button class="btn-secondary btn-sm" onclick="creditSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Terms</button>` : ''}
+            ${lead.creditSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#c9a84c;">✅ ${new Date(lead.creditSubmittedDate).toLocaleDateString()}</div></div>` : ''}
+            <div class="report-actions">
+              ${currentRole === 'credit' && lead.creditStatus !== 'approved' && !lead.creditSubmitted ? `<button class="btn-approve" onclick="creditQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="creditQuickDeny(${lead.id})">❌ Deny</button>` : ''}
+              ${currentRole === 'credit' && lead.creditStatus === 'approved' && !lead.creditSubmitted ? `<button class="btn-submit" onclick="creditQuickSubmit(${lead.id})">📤 Submit to Admin</button>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      window.creditSaveNotes = function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (!lead) return;
+        lead.creditLoanAmount = parseFloat(document.getElementById('creditLoanAmountInput')?.value) || null;
+        lead.creditTermMonths = parseInt(document.getElementById('creditTermInput')?.value) || null;
+        lead.creditROI = parseFloat(document.getElementById('creditROIInput')?.value) || null;
+        lead.creditFees = document.getElementById('creditFeesInput')?.value.trim() || '';
+        lead.creditConditions = document.getElementById('creditConditionsInput')?.value.trim() || '';
+        lead.creditObservation = document.getElementById('creditObservationInput')?.value.trim() || '';
+        lead.creditRecommendation = document.getElementById('creditRecommendationInput')?.value.trim() || '';
+        addFeed(`📝 Credit/sanction terms saved for ${lead.borrower.name}`);
+        persistAll();
+      };
+
+      window.creditQuickApprove = function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (lead) { lead.creditStatus = 'approved';
+          lead.stage = 'Credit Approved';
+          addFeed(`💰 Credit approved for ${lead.borrower.name}`);
+          persistAll();
+          renderPipeline();
+          showDetail(lead); }
+      };
+      window.creditQuickDeny = function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (lead) { lead.creditStatus = 'declined';
+          lead.stage = 'Credit Declined';
+          addFeed(`💰 Credit declined for ${lead.borrower.name}`);
+          persistAll();
+          renderPipeline();
+          showDetail(lead); }
+      };
+      window.creditQuickSubmit = function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (lead && lead.creditStatus === 'approved' && !lead.creditSubmitted) {
+          lead.creditSubmitted = true;
+          lead.creditSubmittedDate = new Date().toISOString();
+          lead.stage = 'Credit Submitted';
+          addFeed(`📤 Credit terms submitted for ${lead.borrower.name}`);
+          if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
+            lead.stage = 'Ready for Admin Approval';
+            addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
+          }
+          persistAll();
+          renderPipeline();
+          showDetail(lead);
+        }
+      };
 
       window.legalQuickApprove = function(id) {
         const lead = leads.find(l => l.id === id);
@@ -5415,6 +5674,10 @@
           lead.legalSubmittedDate = new Date().toISOString();
           lead.stage = 'Legal Submitted';
           addFeed(`📤 Legal submitted for ${lead.borrower.name}`);
+          if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
+            lead.stage = 'Ready for Admin Approval';
+            addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
+          }
           persistAll();
           renderPipeline();
           showDetail(lead);
@@ -5445,7 +5708,7 @@
           lead.technicalSubmittedDate = new Date().toISOString();
           lead.stage = 'Technical Submitted';
           addFeed(`📤 Technical submitted for ${lead.borrower.name}`);
-          if (lead.legalSubmitted && lead.technicalSubmitted) {
+          if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
             lead.stage = 'Ready for Admin Approval';
             addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
           }
@@ -5454,6 +5717,7 @@
           showDetail(lead);
         }
       };
+
 
       // ================================================================
       // 18. SHOW DETAIL / EDIT LEAD
@@ -5495,6 +5759,7 @@
           <div class="detail-row"><span>Assigned BA</span><span>${escapeHtml(lead.assignedBA ? getTeamMemberName(lead.assignedBA, 'ba') : 'Unassigned')}</span></div>
           ${lead.assignedLegal ? `<div class="detail-row"><span>Assigned Legal</span><span>${escapeHtml(getTeamMemberName(lead.assignedLegal, 'legal'))}</span></div>` : ''}
           ${lead.assignedTechnical ? `<div class="detail-row"><span>Assigned Technical</span><span>${escapeHtml(getTeamMemberName(lead.assignedTechnical, 'technical'))}</span></div>` : ''}
+          ${lead.assignedCredit ? `<div class="detail-row"><span>Assigned Credit</span><span>${escapeHtml(getTeamMemberName(lead.assignedCredit, 'credit'))}</span></div>` : ''}
           <div class="detail-row"><span>Legal Status</span><span style="color:${lead.legalStatus === 'approved' ? '#6ad49a' : lead.legalStatus === 'declined' ? '#d46a6a' : '#d4b86a'}">${escapeHtml(lead.legalStatus || 'pending')} ${lead.legalSubmitted ? '📤' : ''}</span></div>
           <div class="detail-row"><span>Technical Status</span><span style="color:${lead.technicalStatus === 'approved' ? '#6ad49a' : lead.technicalStatus === 'declined' ? '#d46a6a' : '#d4b86a'}">${escapeHtml(lead.technicalStatus || 'pending')} ${lead.technicalSubmitted ? '📤' : ''}</span></div>
           <div class="detail-row"><span>Co-applicants</span><span>${lead.coApplicants?.length || 0}</span></div>
@@ -5513,6 +5778,7 @@
             ${currentRole === 'owner' && lead.stage === 'Approved' ? `<button class="btn-primary btn-sm" id="bankTemplateFromDetail">🏦 Bank Template</button>` : ''}
             ${currentRole === 'legal' ? `<button class="btn-secondary btn-sm" id="legalReportFromDetail">📋 Legal Report</button>` : ''}
             ${currentRole === 'technical' ? `<button class="btn-secondary btn-sm" id="technicalReportFromDetail">📋 Tech Report</button>` : ''}
+            ${currentRole === 'credit' ? `<button class="btn-secondary btn-sm" id="creditReportFromDetail">📋 Sanction Terms</button>` : ''}
           </div>
           <div style="margin-top:14px; border-top:1px solid rgba(255,215,0,0.1); padding-top:10px;">
             <div style="color:#c9a84c; font-weight:500; font-size:12px; margin-bottom:6px;">📎 Documents</div>
@@ -5535,6 +5801,8 @@
           lead); });
         document.getElementById('technicalReportFromDetail')?.addEventListener('click', function() {
           openTechnicalReport(lead); });
+        document.getElementById('creditReportFromDetail')?.addEventListener('click', function() {
+          openCreditReport(lead); });
 
         document.getElementById('docUploadBtn')?.addEventListener('click', async function() {
           const fileInput = document.getElementById('docFileInput');
@@ -5632,6 +5900,7 @@
         if (lead.assignedBA) document.getElementById('assignBA').value = lead.assignedBA;
         if (lead.assignedLegal) document.getElementById('assignLegal').value = lead.assignedLegal;
         if (lead.assignedTechnical) document.getElementById('assignTechnical').value = lead.assignedTechnical;
+        if (lead.assignedCredit) document.getElementById('assignCredit').value = lead.assignedCredit;
 
         if (lead.property) {
           const p = lead.property;
@@ -6132,6 +6401,9 @@
           'Assigned BA': l.assignedBA ? getTeamMemberName(l.assignedBA, 'ba') : '',
           'Assigned Legal': l.assignedLegal ? getTeamMemberName(l.assignedLegal, 'legal') : '',
           'Assigned Technical': l.assignedTechnical ? getTeamMemberName(l.assignedTechnical, 'technical') : '',
+          'Assigned Credit': l.assignedCredit ? getTeamMemberName(l.assignedCredit, 'credit') : '',
+          'Credit Status': l.creditStatus || 'pending',
+          'Credit Submitted': l.creditSubmitted ? 'Yes' : 'No',
           'Legal Status': l.legalStatus || 'pending',
           'Technical Status': l.technicalStatus || 'pending',
           'Legal Submitted': l.legalSubmitted ? 'Yes' : 'No',
@@ -6197,6 +6469,9 @@
           'Technical Status': l.technicalStatus || 'pending',
           'Assigned Legal': l.assignedLegal ? getTeamMemberName(l.assignedLegal, 'legal') : '',
           'Assigned Technical': l.assignedTechnical ? getTeamMemberName(l.assignedTechnical, 'technical') : '',
+          'Assigned Credit': l.assignedCredit ? getTeamMemberName(l.assignedCredit, 'credit') : '',
+          'Credit Status': l.creditStatus || 'pending',
+          'Credit Submitted': l.creditSubmitted ? 'Yes' : 'No',
           'BT Amount': l.btTopUpData?.btAmount || 0,
           'Top Up Amount': l.btTopUpData?.topUpAmount || 0,
           'Created': new Date(l.createdAt).toLocaleDateString()
@@ -6346,6 +6621,7 @@
       updateBASelector();
       updateLegalSelector();
       updateTechnicalSelector();
+      updateCreditSelector();
       updateInstitutionSelect();
       handleLoanTypeChange();
       renderFeed();
@@ -6514,6 +6790,7 @@
       window.openBankTemplate = openBankTemplate;
       window.openLegalReport = openLegalReport;
       window.openTechnicalReport = openTechnicalReport;
+      window.openCreditReport = openCreditReport;
       window.applyCibilScore = applyCibilScore;
       window.__persistAll = persistAll;
 
