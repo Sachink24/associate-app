@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Technical Evaluation Report | Solitaire Finz Mart</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js"></script>
+    <script src="supabase-config.js"></script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -934,6 +934,7 @@
                     <option value="admin">DSA Admin</option>
                     <option value="agent">Agent (view only)</option>
                 </select>
+                <button class="icon-btn" id="pullLeadBtn" title="Pull lead from Supabase">&#8681;</button>
                 <button class="icon-btn" id="themeToggle" title="Toggle dark/light">&#9789;</button>
             </div>
         </div>
@@ -941,6 +942,7 @@
             <a href="index.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Home</a>
             <a href="technical.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--gold);background:var(--panel);font-size:11.5px;color:var(--gold);text-decoration:none;white-space:nowrap;">Technical Evaluation</a>
             <a href="legal.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Legal Evaluation</a>
+            <a href="credit.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Credit / Sanction</a>
             <a href="privacy.html" style="flex:0 0 auto;padding:6px 13px;border-radius:100px;border:1px solid var(--border);background:var(--panel);font-size:11.5px;color:var(--ink-dim);text-decoration:none;white-space:nowrap;">Privacy</a>
         </nav>
         <div class="meta-row">
@@ -998,16 +1000,13 @@
         };
 
         // -------------------------------------------------------------
-        // SUPABASE CLOUD SYNC (shared client from js/supabase-config.js)
+        // SUPABASE CLOUD SYNC  (client shared via supabase-config.js)
         // -------------------------------------------------------------
-        const sb = window.sb || null;
+        const sb = window.SolitaireDB ? window.SolitaireDB.sb : null;
         const REPORT_TYPE = 'technical';
-        const MEDIA_BUCKET = window.MEDIA_BUCKET || 'evaluation-media';
+        const MEDIA_BUCKET = window.SolitaireDB ? window.SolitaireDB.MEDIA_BUCKET : 'evaluation-media';
 
         async function uploadDataUrlToStorage(dataUrl, path, contentType) {
-            if (window.SFM && window.SFM.uploadDataUrlToStorage) {
-                return window.SFM.uploadDataUrlToStorage(dataUrl, path, contentType, MEDIA_BUCKET);
-            }
             try {
                 const res = await fetch(dataUrl);
                 const blob = await res.blob();
@@ -1804,6 +1803,46 @@
                 if (!loaded) { state.data.loanAppNo = appNo.trim();
                     renderAll(); }
             }
+        };
+
+        // ---------- Pull Lead from Supabase `leads` table ----------
+        document.getElementById('pullLeadBtn').onclick = async () => {
+            if (!window.SolitaireDB || !window.SolitaireDB.sb) {
+                toast('Supabase not connected'); return;
+            }
+            const term = prompt('Enter Lead ID (e.g. 1030) or borrower name to pull:');
+            if (!term || !term.trim()) return;
+
+            let lead = null;
+            if (/^\d+$/.test(term.trim())) {
+                lead = await window.SolitaireDB.getLeadById(term.trim());
+            } else {
+                const matches = await window.SolitaireDB.searchLeads(term.trim());
+                if (matches.length === 0) { toast('No matching leads found'); return; }
+                if (matches.length === 1) {
+                    lead = matches[0];
+                } else {
+                    const listing = matches.map(m => window.SolitaireDB.leadLabel(m)).join('\n');
+                    const pick = prompt('Multiple leads matched — enter the Lead ID:\n' + listing);
+                    if (!pick) return;
+                    lead = await window.SolitaireDB.getLeadById(pick.trim());
+                }
+            }
+            if (!lead) { toast('Lead not found'); return; }
+
+            const appNo = window.SolitaireDB.loanAppNoForLead(lead);
+            const existing = await loadReportFromCloud(appNo);
+            if (existing) {
+                state.status = existing.status || 'draft';
+                state.data = existing.data || {};
+                state.gps = existing.gps || null;
+                toast('Loaded existing ' + appNo + ' draft for this lead');
+            } else {
+                const mapped = window.SolitaireDB.mapLeadToReportData(lead);
+                state.data = Object.assign({}, state.data, mapped);
+                toast('Pulled lead #' + lead.id + ' → ' + appNo);
+            }
+            renderAll();
         };
 
         initReport();
