@@ -4143,7 +4143,8 @@
           loginError.textContent = '⚠️ Password reset requires your registered email address. Contact admin if you only have a mobile login.';
           return;
         }
-        const { error } = await sb.auth.resetPasswordForEmail(identifier, { redirectTo: window.location.href });
+        const resetUrl = new URL('reset-password.html', window.location.href).href;
+        const { error } = await sb.auth.resetPasswordForEmail(identifier, { redirectTo: resetUrl });
         if (error) {
           loginError.textContent = '❌ Could not send reset email: ' + error.message;
           return;
