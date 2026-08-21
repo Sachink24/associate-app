@@ -3905,6 +3905,7 @@
         if (currentRole === 'business') { scopedLeads = leads.filter(l => l.assignedBA === currentUser); scopeLabel = 'Your Leads'; }
         else if (currentRole === 'legal') { scopedLeads = leads.filter(l => l.assignedLegal === currentUser); scopeLabel = 'Assigned to You'; }
         else if (currentRole === 'technical') { scopedLeads = leads.filter(l => l.assignedTechnical === currentUser); scopeLabel = 'Assigned to You'; }
+        else if (currentRole === 'credit') { scopedLeads = leads.filter(l => l.assignedCredit === currentUser); scopeLabel = 'Assigned to You'; }
 
         const total = scopedLeads.length;
         const totalAmount = scopedLeads.reduce((s, l) => s + (l.loanAmount || 0), 0);
@@ -3975,6 +3976,14 @@
             return `<div style="display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span>🔧 ${escapeHtml(m.name)}</span><span style="color:#8a7f66;">${a} ✅ &nbsp; ${d} ❌ &nbsp; ${p} ⏳</span></div>`;
           }).join('') || '<div style="color:#6a5f48; font-size:12px;">No technical team members yet.</div>';
 
+          const creditRows = creditTeam.map(m => {
+            const mLeads = leads.filter(l => l.assignedCredit === m.email);
+            const a = mLeads.filter(l => l.creditStatus === 'approved').length;
+            const d = mLeads.filter(l => l.creditStatus === 'declined').length;
+            const p = mLeads.length - a - d;
+            return `<div style="display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);"><span>💰 ${escapeHtml(m.name)}</span><span style="color:#8a7f66;">${a} ✅ &nbsp; ${d} ❌ &nbsp; ${p} ⏳</span></div>`;
+          }).join('') || '<div style="color:#6a5f48; font-size:12px;">No credit team members yet.</div>';
+
           html += `
             <div class="card" style="margin-bottom:12px;">
               <div class="card-title"><i class="fas fa-user-tie"></i> Business Associate Performance</div>
@@ -3984,9 +3993,13 @@
               <div class="card-title"><i class="fas fa-balance-scale"></i> Legal Team Performance</div>
               ${legalRows}
             </div>
-            <div class="card" style="margin-bottom:6px;">
+            <div class="card" style="margin-bottom:12px;">
               <div class="card-title"><i class="fas fa-hard-hat"></i> Technical Team Performance</div>
               ${techRows}
+            </div>
+            <div class="card" style="margin-bottom:6px;">
+              <div class="card-title"><i class="fas fa-hand-holding-usd"></i> Credit Team Performance</div>
+              ${creditRows}
             </div>
           `;
         }
