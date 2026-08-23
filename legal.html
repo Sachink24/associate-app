@@ -585,7 +585,126 @@
             background: var(--border-soft);
         }
 
-        /* photo upload */
+        /* ===== Section lock / unlock ===== */
+.rail-item.locked {
+  opacity: .55;
+}
+
+.rail-item.locked .num {
+  background: var(--border-soft);
+  color: var(--ink-faint);
+}
+
+.section.locked .section-head {
+  cursor: not-allowed;
+}
+
+.section.locked .section-title {
+  color: var(--ink-faint);
+}
+
+.lock-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  background: var(--panel-2);
+}
+
+.lock-banner .lock-ico {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--border-soft);
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.lock-banner .lock-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.lock-banner .lock-sub {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 3px;
+}
+
+.lock-banner .lock-link {
+  color: var(--gold);
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.unlock-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.unlock-panel-title {
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.unlock-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 12px;
+  border-top: 1px dashed var(--border-soft);
+}
+
+.unlock-item:first-of-type {
+  border-top: none;
+}
+
+.unlock-item .u-label {
+  color: var(--ink-dim);
+}
+
+.unlock-item.final .u-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.unlock-val {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.unlock-val.done {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.unlock-val.pending {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.unlock-val.locked {
+  color: var(--ink-faint);
+  background: var(--border-soft);
+}
+
+/* photo upload */
         .photo-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -1154,6 +1273,9 @@
             id: 'sec4',
             title: 'Litigation & Encumbrance Search',
             desc: 'Court records, revenue records & dispute history',
+            gate: 'sec3',
+            gateLabel: 'Document Verification',
+            gateNote: 'Complete document verification before running the litigation and encumbrance search.',
             fields: [
                 { key: 'searchAgency', label: 'Search Conducted By', type: 'text' },
                 { key: 'searchPeriodYears', label: 'Search Period (years)', type: 'number', req: true },
@@ -1172,6 +1294,9 @@
             id: 'sec5',
             title: 'Statutory Compliance',
             desc: 'Registration, stamp duty & regulatory sign-offs',
+            gate: 'sec4',
+            gateLabel: 'Litigation & Encumbrance Search',
+            gateNote: 'Complete the litigation and encumbrance search before confirming statutory compliance.',
             fields: [
                 { key: 'stampDutyPaid', label: 'Stamp Duty Paid & Adequate', type: 'radio', options: ['Yes',
                         'No'
@@ -1303,6 +1428,44 @@
             return (sec.fields || []).filter(f => f.req).every(f => state.data[f.key]);
         }
 
+        const GATE_CHAIN = [
+            { id: 'sec3', label: 'Document Verification' },
+            { id: 'sec4', label: 'Litigation & Encumbrance Search' },
+            { id: 'sec5', label: 'Statutory Compliance', final: true }
+        ];
+
+        // ---------- Section gating (unlock flow) ----------
+        function isLocked(sec) {
+            if (!sec.gate) return false;
+            if (state.role === 'admin') return false; // admin/reviewer can always inspect
+            const gateSec = schema.find(s => s.id === sec.gate);
+            return gateSec ? !sectionComplete(gateSec) : false;
+        }
+
+        function unlockGates() {
+            return GATE_CHAIN.map(g => {
+                const sec = schema.find(s => s.id === g.id);
+                const locked = isLocked(sec);
+                const done = sectionComplete(sec);
+                let status = 'pending', val = '⏳ Pending';
+                if (locked) { status = 'locked'; val = '🔒 Locked'; }
+                else if (done) { status = 'done'; val = '✅ Complete'; }
+                return { label: g.label, status, val, final: !!g.final };
+            });
+        }
+
+        function renderUnlockPanel() {
+            const items = unlockGates();
+            return `<div class="unlock-panel">
+              <div class="unlock-panel-title">🔓 Report Section Unlock Status</div>
+              ${items.map(it => `<div class="unlock-item${it.final ? ' final' : ''}">
+                <span class="u-label">${it.label}</span>
+                <span class="unlock-val ${it.status}">${it.val}</span>
+              </div>`).join('')}
+            </div>`;
+        }
+
+
         let submitAttempted = false;
 
         function getMissingRequired() {
@@ -1320,11 +1483,13 @@
             const rail = document.getElementById('rail');
             rail.innerHTML = '';
             schema.forEach((sec, i) => {
+                const locked = isLocked(sec);
                 const done = sectionComplete(sec);
                 const el = document.createElement('div');
-                el.className = 'rail-item' + (state.openSection === sec.id ? ' active' : '') + (done ? ' done' : '');
-                el.innerHTML = `<span class="num">${done ? '&#10003;' : i + 1}</span><span>${sec.title}</span>`;
+                el.className = 'rail-item' + (state.openSection === sec.id ? ' active' : '') + (done ? ' done' : '') + (locked ? ' locked' : '');
+                el.innerHTML = `<span class="num">${locked ? '&#128274;' : (done ? '&#10003;' : i + 1)}</span><span>${sec.title}</span>`;
                 el.onclick = () => {
+                    if (locked) { toast('This section is locked \u2014 complete ' + (sec.gateLabel || 'the previous section') + ' first'); return; }
                     state.openSection = sec.id;
                     renderAll();
                     document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1338,16 +1503,26 @@
         // -------------------------------------------------------------
         function renderForm() {
             const root = document.getElementById('formRoot');
-            root.innerHTML = schema.map((sec, i) => {
-                const open = state.openSection === sec.id;
+            const sectionsHtml = schema.map((sec, i) => {
+                const locked = isLocked(sec);
+                const open = locked || state.openSection === sec.id;
                 const complete = sectionComplete(sec);
                 let body = '';
-                if (sec.type === 'verify') {
+                if (locked) {
+                    const gateSec = schema.find(s => s.id === sec.gate);
+                    body = `<div class="lock-banner">
+                      <div class="lock-ico">\ud83d\udd12</div>
+                      <div>
+                        <div class="lock-title">Locked until ${sec.gateLabel || (gateSec ? gateSec.title : 'the previous section')} is complete</div>
+                        <div class="lock-sub">${sec.gateNote || ''} <span class="lock-link" onclick="jumpToSection('${sec.gate}')">Go to ${sec.gateLabel || (gateSec ? gateSec.title : '')}</span></div>
+                      </div>
+                    </div>`;
+                } else if (sec.type === 'verify') {
                     body = verifySectionHTML(sec);
                 } else {
                     body = `<div class="field-grid">${sec.fields.map(f => fieldHTML(f, sec.id)).join('')}</div>`;
                 }
-                return `<div class="section${open ? ' open' : ''}" id="${sec.id}">
+                return `<div class="section${open ? ' open' : ''}${locked ? ' locked' : ''}" id="${sec.id}">
               <div class="section-head" onclick="toggleSection('${sec.id}')">
                 <div class="section-head-left">
                   <div class="section-idx">${String(i + 1).padStart(2, '0')}</div>
@@ -1357,13 +1532,14 @@
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <div class="section-status">${complete ? 'Complete' : 'Pending'}</div>
-                  <div class="chev">&#9660;</div>
+                  <div class="section-status">${locked ? 'Locked' : (complete ? 'Complete' : 'Pending')}</div>
+                  <div class="chev">${locked ? '' : '&#9660;'}</div>
                 </div>
               </div>
               <div class="section-body"><div class="section-body-inner">${body}</div></div>
             </div>`;
             }).join('');
+            root.innerHTML = renderUnlockPanel() + sectionsHtml;
 
             // attach change handlers for text/number/date/select/textarea
             root.querySelectorAll('[data-key]').forEach(el => {
@@ -1586,8 +1762,16 @@
 
         // ---------- Section toggle ----------
         function toggleSection(id) {
+            const sec = schema.find(s => s.id === id);
+            if (sec && isLocked(sec)) { toast('This section is locked \u2014 complete ' + (sec.gateLabel || 'the previous section') + ' first'); return; }
             state.openSection = state.openSection === id ? null : id;
             renderAll();
+        }
+
+        function jumpToSection(id) {
+            state.openSection = id;
+            renderAll();
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         // ---------- Signature pad ----------
