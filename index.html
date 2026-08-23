@@ -3493,6 +3493,12 @@
 
       async function syncToSupabase() {
         if (!sb) return;
+        const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+        const session = sessionData && sessionData.session;
+        if (sessionError || !session || !session.user) {
+          setSyncStatus('☁️ Sign in to sync cloud data');
+          return;
+        }
         if (syncInFlight) { syncQueued = true; return; }
         syncInFlight = true;
         setSyncStatus('⏳ Syncing to cloud…');
@@ -3528,6 +3534,12 @@
 
       async function loadFromSupabase() {
         if (!sb) { setSyncStatus('⚡ Offline mode · data stored in browser (localStorage)'); return false; }
+        const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+        const session = sessionData && sessionData.session;
+        if (sessionError || !session || !session.user) {
+          setSyncStatus('🔒 Sign in to connect to cloud');
+          return false;
+        }
         setSyncStatus('⏳ Connecting to cloud…');
         try {
           const [baRes, legalRes, techRes, creditRes, feedRes, cibilRes] = await Promise.all([
@@ -4242,6 +4254,7 @@
           foundUser = { password: row.password, role: row.role, name: row.name, mobile: row.mobile, status: row.status };
           users[foundKey] = foundUser;
           await loadLeadsFromSupabase();
+          await loadFromSupabase();
         } else {
           // Fallback: local/offline check (used only if Supabase is unreachable,
           // or for a non-email identifier such as a mobile number)
