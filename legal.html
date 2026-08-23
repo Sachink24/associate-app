@@ -1005,6 +1005,444 @@
             }
         }
 
+
+        /* ============================================================
+           RESPONSIVE MOBILE/TABLET FIX
+           Keeps the existing design/functionality while preventing
+           horizontal overflow on phones and tablets.
+           ============================================================ */
+
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        body,
+        .topbar,
+        .topbar-row,
+        .rail,
+        .wrap,
+        .section,
+        .section-body,
+        .section-body-inner,
+        .field,
+        .field-grid,
+        .unlock-panel,
+        .photo-grid,
+        .actionbar,
+        .actionbar-inner {
+            min-width: 0;
+        }
+
+        .topbar {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .topbar-row {
+            width: 100%;
+        }
+
+        .brandmark {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .brand-text {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        .topbar-actions {
+            min-width: 0;
+        }
+
+        .role-select {
+            max-width: 100%;
+            min-width: 0;
+        }
+
+        .rail {
+            width: 100%;
+            max-width: 100%;
+            overscroll-behavior-x: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 760px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .section {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .section-head-left {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .section-title,
+        .section-desc,
+        .section-status,
+        .field label,
+        .verify-name,
+        .verify-note,
+        .lock-title,
+        .lock-sub,
+        .u-label {
+            overflow-wrap: anywhere;
+            word-break: normal;
+        }
+
+        .section-status {
+            max-width: 35%;
+            min-width: 0;
+        }
+
+        .section-body-inner {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .field-grid {
+            width: 100%;
+        }
+
+        .field {
+            min-width: 0;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="search"],
+        select,
+        textarea {
+            max-width: 100%;
+            min-width: 0;
+        }
+
+        .verify-row,
+        .verify-row-top,
+        .lock-banner,
+        .gps-box,
+        .unlock-item {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        .verify-row-top {
+            width: 100%;
+        }
+
+        .verify-name,
+        .verify-note {
+            min-width: 0;
+        }
+
+        .gps-box .coords {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .btn-mini {
+            flex: 0 0 auto;
+            max-width: 100%;
+        }
+
+        canvas.sigpad {
+            display: block;
+            max-width: 100%;
+        }
+
+        .actionbar {
+            width: 100%;
+            max-width: 100%;
+            padding-left: max(10px, env(safe-area-inset-left));
+            padding-right: max(10px, env(safe-area-inset-right));
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+
+        .actionbar-inner {
+            width: 100%;
+            max-width: 760px;
+        }
+
+        .btn {
+            min-width: 0;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+
+        /* Phones */
+        @media (max-width: 767px) {
+            .topbar {
+                padding: 9px 12px;
+            }
+
+            .topbar-row {
+                flex-wrap: wrap;
+                align-items: center;
+                row-gap: 8px;
+            }
+
+            .brandmark {
+                flex: 1 1 170px;
+            }
+
+            .brand-text .name {
+                font-size: 15px;
+            }
+
+            .brand-text .sub {
+                font-size: 8.5px;
+                letter-spacing: 1.2px;
+                white-space: normal;
+            }
+
+            .topbar-actions {
+                flex: 1 1 100%;
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .topbar-actions .role-select {
+                flex: 1 1 auto;
+                width: auto;
+            }
+
+            .icon-btn {
+                flex: 0 0 34px;
+            }
+
+            .topbar nav {
+                width: calc(100% + 0px);
+                max-width: 100%;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .meta-row {
+                min-width: 0;
+            }
+
+            .app-no {
+                min-width: 0;
+                max-width: 100%;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+
+            .progress-label {
+                gap: 10px;
+            }
+
+            .progress-label span {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
+            .wrap {
+                max-width: 100%;
+                padding: 12px 10px 118px;
+            }
+
+            .section-head {
+                padding: 12px 11px;
+            }
+
+            .section-body-inner {
+                padding: 11px;
+            }
+
+            .section-head-left {
+                gap: 8px;
+            }
+
+            .section-idx {
+                width: 24px;
+                font-size: 18px;
+            }
+
+            .section-title {
+                font-size: 13.5px;
+            }
+
+            .section-desc {
+                font-size: 10.5px;
+            }
+
+            .section-status {
+                max-width: 28%;
+                font-size: 9.5px;
+            }
+
+            .unlock-panel {
+                padding: 11px;
+            }
+
+            .unlock-item {
+                gap: 8px;
+                align-items: flex-start;
+            }
+
+            .unlock-item .u-label {
+                flex: 1 1 auto;
+                min-width: 0;
+            }
+
+            .unlock-val {
+                flex: 0 0 auto;
+            }
+
+            .field-grid {
+                grid-template-columns: 1fr;
+                gap: 9px;
+            }
+
+            .field.full {
+                grid-column: auto;
+            }
+
+            .photo-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 6px;
+            }
+
+            .gps-box {
+                flex-wrap: wrap;
+            }
+
+            .gps-box .coords {
+                flex: 1 1 100%;
+            }
+
+            .btn-mini {
+                width: 100%;
+                text-align: center;
+            }
+
+            .actionbar {
+                padding-top: 9px;
+            }
+
+            .actionbar-inner {
+                gap: 6px;
+                padding: 6px;
+                border-radius: 10px;
+            }
+
+            .btn {
+                padding: 10px 7px;
+                font-size: 11.5px;
+                line-height: 1.25;
+            }
+        }
+
+        /* Very small phones */
+        @media (max-width: 420px) {
+            .topbar {
+                padding-left: 9px;
+                padding-right: 9px;
+            }
+
+            .crest {
+                width: 30px;
+                height: 30px;
+            }
+
+            .brandmark {
+                gap: 7px;
+            }
+
+            .brand-text .name {
+                font-size: 14px;
+            }
+
+            .brand-text .sub {
+                font-size: 7.5px;
+            }
+
+            .topbar-actions {
+                gap: 6px;
+            }
+
+            select.role-select {
+                font-size: 11px;
+                padding: 7px 6px;
+            }
+
+            .icon-btn {
+                width: 32px;
+                height: 32px;
+                flex-basis: 32px;
+            }
+
+            .rail {
+                padding-left: 9px;
+                padding-right: 9px;
+            }
+
+            .wrap {
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-bottom: 116px;
+            }
+
+            .section-head {
+                gap: 7px;
+            }
+
+            .section-status {
+                max-width: 24%;
+            }
+
+            .progress-label {
+                font-size: 9.5px;
+            }
+
+            .actionbar {
+                padding-left: 7px;
+                padding-right: 7px;
+            }
+
+            .actionbar-inner {
+                gap: 5px;
+            }
+
+            .btn {
+                padding-left: 5px;
+                padding-right: 5px;
+                font-size: 10.5px;
+            }
+        }
+
+        /* Tablets: keep the comfortable two-column form layout */
+        @media (min-width: 601px) and (max-width: 1024px) {
+            .wrap {
+                width: 100%;
+                max-width: 900px;
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .topbar {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .field-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
         @media print {
             .topbar,
             .rail,
