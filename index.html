@@ -4196,19 +4196,19 @@
         else if (role === 'credit') userRole = 'credit';
         else userRole = 'customer';
         if (role === 'business' && !businessAssociates.find(b => b.email === email)) {
-          businessAssociates.push({ id: businessAssociates.reduce((max, b) => Math.max(max, b.id), 0) + 1, name,
+          businessAssociates.push({ id: Date.now(), name,
             phone: mobile, email, status: 'pending' });
         }
         if (role === 'legal' && !legalTeam.find(b => b.email === email)) {
-          legalTeam.push({ id: legalTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email, phone: mobile,
+          legalTeam.push({ id: Date.now(), name, email, phone: mobile,
             status: 'pending' });
         }
         if (role === 'technical' && !technicalTeam.find(b => b.email === email)) {
-          technicalTeam.push({ id: technicalTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email,
+          technicalTeam.push({ id: Date.now(), name, email,
             phone: mobile, status: 'pending' });
         }
         if (role === 'credit' && !creditTeam.find(b => b.email === email)) {
-          creditTeam.push({ id: creditTeam.reduce((max, b) => Math.max(max, b.id), 0) + 1, name, email,
+          creditTeam.push({ id: Date.now(), name, email,
             phone: mobile, status: 'pending' });
         }
         persistAll();
