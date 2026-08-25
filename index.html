@@ -4646,10 +4646,10 @@
             .forEach(el => { el.style.display = ''; });
           document.querySelectorAll('.property-card').forEach(card => { card.style.display = ''; });
           if (addCoBtn) addCoBtn.style.display = 'none';
-          setReadOnlyState(captureCard, true);
         } else if (isBusiness) {
           captureCard.style.opacity = '1';
           captureCard.style.pointerEvents = 'auto';
+          setReadOnlyState(captureCard, false);
           if (saveBtn) saveBtn.disabled = false;
           if (feedback) feedback.innerHTML = '';
           hideSimulatorTab(false);
@@ -4660,6 +4660,7 @@
         } else if (isAdmin) {
           captureCard.style.opacity = '1';
           captureCard.style.pointerEvents = 'auto';
+          setReadOnlyState(captureCard, false);
           if (saveBtn) saveBtn.disabled = false;
           if (feedback) feedback.innerHTML = '';
           hideSimulatorTab(false);
