@@ -4603,11 +4603,12 @@
           });
           if (addCoBtn) addCoBtn.style.display = 'none';
         } else if (isLegal) {
-          captureCard.style.opacity = '0.5';
-          captureCard.style.pointerEvents = 'none';
+          captureCard.style.opacity = '0.85';
+          captureCard.style.pointerEvents = 'auto';
           if (saveBtn) saveBtn.disabled = true;
           if (feedback) feedback.innerHTML = '<span style="color:#6a9ad4;">⚖️ Legal Team - Viewing Legal Reports only</span>';
           hideSimulatorTab(true);
+          setReadOnlyState(captureCard, true);
           document.querySelectorAll('#screen-capture .card-title, #screen-capture .form-group, #screen-capture .btn-primary, #screen-capture .btn-success')
             .forEach(el => {
               if (!el.closest('#propertyCardLegal') && !el.closest('#propertySectionWrapper')) {
@@ -4624,12 +4625,13 @@
             btn.classList.add('opt-disabled');
           });
         } else if (isTechnical) {
-          captureCard.style.opacity = '0.5';
-          captureCard.style.pointerEvents = 'none';
+          captureCard.style.opacity = '0.85';
+          captureCard.style.pointerEvents = 'auto';
           if (saveBtn) saveBtn.disabled = true;
           if (feedback) feedback.innerHTML =
             '<span style="color:#d4a86a;">🔧 Technical Team - Viewing Property Evaluation only</span>';
           hideSimulatorTab(true);
+          setReadOnlyState(captureCard, true);
           document.querySelectorAll('#screen-capture .card-title, #screen-capture .form-group, #screen-capture .btn-primary, #screen-capture .btn-success')
             .forEach(el => {
               if (!el.closest('#propertyCardDetails') && !el.closest('#propertyCardDimensions') && !el
@@ -4653,11 +4655,12 @@
           // dedicated Credit Recommendation panel in the case detail view, and their
           // only write path is the credit_submit_recommendation() RPC — enforced at
           // the database level regardless of what the UI shows.
-          captureCard.style.opacity = '0.7';
-          captureCard.style.pointerEvents = 'none';
+          captureCard.style.opacity = '0.85';
+          captureCard.style.pointerEvents = 'auto';
           if (saveBtn) saveBtn.disabled = true;
           if (feedback) feedback.innerHTML = '<span style="color:#c9a84c;">💰 Credit Team — Review &amp; Recommend Only. Open a case and use the Credit Recommendation panel to submit for Admin approval.</span>';
           hideSimulatorTab(true);
+          setReadOnlyState(captureCard, true);
           document.querySelectorAll('#screen-capture .card-title, #screen-capture .form-group, #screen-capture .btn-primary, #screen-capture .btn-success')
             .forEach(el => { el.style.display = ''; });
           document.querySelectorAll('.property-card').forEach(card => { card.style.display = ''; });
