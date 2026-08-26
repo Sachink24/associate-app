@@ -231,6 +231,12 @@
             border-color: rgba(193, 89, 78, .35);
         }
 
+        .badge-rework {
+            background: var(--warn-bg);
+            color: var(--warn);
+            border-color: rgba(207, 154, 69, .35);
+        }
+
         .app-no {
             font-family: 'IBM Plex Mono', monospace;
             font-size: 11.5px;
@@ -961,6 +967,30 @@
             border-color: rgba(193, 89, 78, .35);
         }
 
+        .btn-warn {
+            background: var(--warn-bg);
+            color: var(--warn);
+            border-color: rgba(207, 154, 69, .35);
+        }
+
+        .rework-banner {
+            background: var(--warn-bg);
+            border: 1px solid rgba(207, 154, 69, .4);
+            color: var(--warn);
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 12.5px;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .rework-banner .rw-meta {
+            font-size: 11px;
+            opacity: .8;
+            margin-top: 3px;
+        }
+
         .toast {
             position: fixed;
             top: 14px;
@@ -1539,12 +1569,16 @@
         // -------------------------------------------------------------
         const state = {
             role: 'valuer',
-            status: 'draft', // draft | submitted | review | approved | rejected
+            status: 'draft', // draft | submitted | review | approved | rejected | admin_rework
             data: {},
             photos: {}, // slot -> dataURL
             gps: null,
             signature: null,
-            openSection: 'sec1'
+            openSection: 'sec1',
+            reworkReason: null,
+            reworkBy: null,
+            reworkAt: null,
+            reportVersion: 1
         };
 
         // ---------- Sample / dummy prefill data ----------
@@ -1582,6 +1616,10 @@
             state.status = data.status || 'draft';
             state.data = data.data || {};
             state.gps = data.gps || null;
+            state.reworkReason = data.rework_reason || null;
+            state.reworkBy = data.rework_by || null;
+            state.reworkAt = data.rework_at || null;
+            state.reportVersion = data.version || 1;
             state.photos = {};
             const photoPaths = state.data.__photoPaths || {};
             for (const slot in photoPaths) {
@@ -1852,7 +1890,8 @@
                 submitted: ['Submitted', 'badge-submitted'],
                 review: ['Under Review', 'badge-review'],
                 approved: ['Approved', 'badge-approved'],
-                rejected: ['Rejected', 'badge-rejected']
+                rejected: ['Rejected', 'badge-rejected'],
+                admin_rework: ['Rework Required', 'badge-rework']
             };
             return map[state.status];
         }
@@ -2276,36 +2315,51 @@
         // -------------------------------------------------------------
         // RENDER: ACTION BAR
         // -------------------------------------------------------------
+        function reworkBannerHTML() {
+            if (state.status !== 'admin_rework' || !state.reworkReason) return '';
+            const meta = [state.reworkBy ? ('By ' + escapeHTML(state.reworkBy)) : '', state.reworkAt ? new Date(state.reworkAt).toLocaleString() : '']
+                .filter(Boolean).join(' · ');
+            return `<div class="rework-banner"><strong>Rework Required</strong> — ${escapeHTML(state.reworkReason)}<div class="rw-meta">${meta}</div></div>`;
+        }
+
         function renderActionBar() {
             const bar = document.getElementById('actionBar');
+            const banner = reworkBannerHTML();
             if (state.role === 'agent') {
-                bar.innerHTML = `<button class="btn btn-ghost" disabled>View only — Agent access</button>`;
+                bar.innerHTML = banner + `<button class="btn btn-ghost" disabled>View only — Agent access</button>`;
                 return;
             }
             if (state.role === 'admin') {
                 if (state.status === 'submitted' || state.status === 'review') {
-                    bar.innerHTML = `
+                    bar.innerHTML = banner + `
                 <button class="btn btn-bad" onclick="rejectReport()">Reject</button>
+                <button class="btn btn-warn" onclick="reworkReport()">Send Rework</button>
                 <button class="btn btn-ok" onclick="approveReport()">Approve</button>`;
                 } else if (state.status === 'approved') {
-                    bar.innerHTML = `<button class="btn btn-gold" onclick="exportPDF()">Export Bank-Ready PDF</button>`;
+                    bar.innerHTML = banner + `<button class="btn btn-gold" onclick="exportPDF()">Export Bank-Ready PDF</button>`;
+                } else if (state.status === 'admin_rework') {
+                    bar.innerHTML = banner + `<button class="btn btn-ghost" disabled>Waiting on Legal Associate to resubmit</button>`;
                 } else {
-                    bar.innerHTML =
+                    bar.innerHTML = banner +
                         `<button class="btn btn-ghost" disabled>Awaiting submission from Legal Associate</button>`;
                 }
                 return;
             }
             // valuer
             if (state.status === 'draft') {
-                bar.innerHTML = `
+                bar.innerHTML = banner + `
               <button class="btn btn-ghost" onclick="saveDraft()">Save Draft</button>
               <button class="btn btn-gold" onclick="submitReport()">Submit Report</button>`;
             } else if (state.status === 'rejected') {
-                bar.innerHTML = `
+                bar.innerHTML = banner + `
               <button class="btn btn-ghost" onclick="reopenDraft()">Revise & Reopen</button>
               <button class="btn btn-gold" onclick="submitReport()">Resubmit</button>`;
+            } else if (state.status === 'admin_rework') {
+                bar.innerHTML = banner + `
+              <button class="btn btn-ghost" onclick="saveDraft()">Save Draft</button>
+              <button class="btn btn-gold" onclick="submitReport()">Resubmit After Rework</button>`;
             } else {
-                bar.innerHTML = `<button class="btn btn-gold" onclick="exportPDF()">Export PDF Preview</button>`;
+                bar.innerHTML = banner + `<button class="btn btn-gold" onclick="exportPDF()">Export PDF Preview</button>`;
             }
         }
 
@@ -2317,6 +2371,11 @@
             toast(ok ? 'Saved as draft' : 'Save failed — check connection');
         }
 
+        function currentUserEmail() {
+            return (window.SolitaireAuth && window.SolitaireAuth.profile &&
+                (window.SolitaireAuth.profile.email || window.SolitaireAuth.profile.name)) || state.role;
+        }
+
         async function submitReport() {
             submitAttempted = true;
             const missing = getMissingRequired();
@@ -2326,21 +2385,80 @@
                 toast(`${missing.length} required field(s) missing`);
                 return;
             }
+            const oldStatus = state.status;
+            const wasRework = oldStatus === 'admin_rework';
             state.status = 'submitted';
             const ok = await syncReportToCloud(false);
+            if (ok && window.SolitaireDB) {
+                const email = currentUserEmail();
+                await window.SolitaireDB.patchReportStatus(REPORT_TYPE, state.data.loanAppNo, {
+                    submitted_by: email, submitted_at: new Date().toISOString(),
+                    rework_reason: null, rework_by: null, rework_at: null,
+                    version: (state.reportVersion || 1) + 1
+                });
+                await window.SolitaireDB.logWorkflowEvent({
+                    leadId: state.data.__leadId, applicationNo: state.data.loanAppNo,
+                    action: 'LEGAL_' + (wasRework ? 'RESUBMITTED' : 'SUBMITTED'),
+                    oldStatus, newStatus: 'submitted'
+                });
+                await window.SolitaireDB.syncLeadStatus(state.data.__leadId, REPORT_TYPE, 'submitted');
+                state.reworkReason = null; state.reworkBy = null; state.reworkAt = null;
+            }
             toast(ok ? 'Report submitted for review' : 'Submitted locally — cloud save failed');
             renderAll();
         }
 
-        async function approveReport() { state.status = 'approved';
+        async function approveReport() {
+            const oldStatus = state.status;
+            state.status = 'approved';
             await syncReportToCloud(false);
+            if (window.SolitaireDB) {
+                const email = currentUserEmail();
+                await window.SolitaireDB.patchReportStatus(REPORT_TYPE, state.data.loanAppNo, { approved_by: email, approved_at: new Date().toISOString() });
+                await window.SolitaireDB.logWorkflowEvent({ leadId: state.data.__leadId, applicationNo: state.data.loanAppNo, action: 'LEGAL_APPROVED', oldStatus, newStatus: 'approved' });
+                await window.SolitaireDB.syncLeadStatus(state.data.__leadId, REPORT_TYPE, 'approved');
+            }
             toast('Report approved');
-            renderAll(); }
+            renderAll();
+        }
 
-        async function rejectReport() { state.status = 'rejected';
+        async function rejectReport() {
+            const oldStatus = state.status;
+            state.status = 'rejected';
             await syncReportToCloud(false);
+            if (window.SolitaireDB) {
+                const email = currentUserEmail();
+                await window.SolitaireDB.patchReportStatus(REPORT_TYPE, state.data.loanAppNo, { rejected_by: email, rejected_at: new Date().toISOString() });
+                await window.SolitaireDB.logWorkflowEvent({ leadId: state.data.__leadId, applicationNo: state.data.loanAppNo, action: 'LEGAL_REJECTED', oldStatus, newStatus: 'rejected' });
+                await window.SolitaireDB.syncLeadStatus(state.data.__leadId, REPORT_TYPE, 'rejected');
+            }
             toast('Report rejected — sent back to associate');
-            renderAll(); }
+            renderAll();
+        }
+
+        async function reworkReport() {
+            const reason = prompt('Rework reason (visible to the associate):');
+            if (!reason || !reason.trim()) return;
+            const oldStatus = state.status;
+            state.status = 'admin_rework';
+            state.reworkReason = reason.trim();
+            await syncReportToCloud(false);
+            if (window.SolitaireDB) {
+                const email = currentUserEmail();
+                state.reworkBy = email;
+                state.reworkAt = new Date().toISOString();
+                await window.SolitaireDB.patchReportStatus(REPORT_TYPE, state.data.loanAppNo, {
+                    rework_reason: state.reworkReason, rework_by: email, rework_at: state.reworkAt
+                });
+                await window.SolitaireDB.logWorkflowEvent({
+                    leadId: state.data.__leadId, applicationNo: state.data.loanAppNo,
+                    action: 'LEGAL_REWORK', oldStatus, newStatus: 'admin_rework', remarks: state.reworkReason
+                });
+                await window.SolitaireDB.syncLeadStatus(state.data.__leadId, REPORT_TYPE, 'admin_rework');
+            }
+            toast('Sent back for rework');
+            renderAll();
+        }
 
         async function reopenDraft() { state.status = 'draft';
             await syncReportToCloud(false);
