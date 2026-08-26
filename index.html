@@ -3420,6 +3420,14 @@
           rework_reason: lead.reworkReason || null,
           rework_requested_by: lead.reworkRequestedBy || null,
           rework_requested_at: lead.reworkRequestedAt || null,
+          legal_submitted_by: lead.legalSubmittedBy || null,
+          legal_rework_reason: lead.legalReworkReason || null,
+          legal_rework_requested_by: lead.legalReworkRequestedBy || null,
+          legal_rework_requested_at: lead.legalReworkRequestedAt || null,
+          technical_submitted_by: lead.technicalSubmittedBy || null,
+          technical_rework_reason: lead.technicalReworkReason || null,
+          technical_rework_requested_by: lead.technicalReworkRequestedBy || null,
+          technical_rework_requested_at: lead.technicalReworkRequestedAt || null,
           rejected_reason: lead.rejectedReason || null,
           rejected_by: lead.rejectedBy || null,
           rejected_at: lead.rejectedAt || null,
@@ -3478,6 +3486,14 @@
           reworkReason: row.rework_reason,
           reworkRequestedBy: row.rework_requested_by,
           reworkRequestedAt: row.rework_requested_at,
+          legalSubmittedBy: row.legal_submitted_by,
+          legalReworkReason: row.legal_rework_reason,
+          legalReworkRequestedBy: row.legal_rework_requested_by,
+          legalReworkRequestedAt: row.legal_rework_requested_at,
+          technicalSubmittedBy: row.technical_submitted_by,
+          technicalReworkReason: row.technical_rework_reason,
+          technicalReworkRequestedBy: row.technical_rework_requested_by,
+          technicalReworkRequestedAt: row.technical_rework_requested_at,
           rejectedReason: row.rejected_reason,
           rejectedBy: row.rejected_by,
           rejectedAt: row.rejected_at,
@@ -4997,8 +5013,8 @@
       document.getElementById('saveLeadBtn').addEventListener('click', saveLead);
 
       function saveLead() {
-        if (currentRole === 'credit') {
-          document.getElementById('captureFeedback').innerHTML = '🚫 Credit Team cannot create new leads. Please contact Admin.';
+        if (currentRole === 'credit' || currentRole === 'legal' || currentRole === 'technical') {
+          document.getElementById('captureFeedback').innerHTML = '🚫 Your role cannot create new leads. Please contact Admin.';
           return;
         }
         const name = document.getElementById('borrowerName').value.trim();
@@ -5212,6 +5228,14 @@
           reworkReason: null,
           reworkRequestedBy: null,
           reworkRequestedAt: null,
+          legalSubmittedBy: null,
+          legalReworkReason: null,
+          legalReworkRequestedBy: null,
+          legalReworkRequestedAt: null,
+          technicalSubmittedBy: null,
+          technicalReworkReason: null,
+          technicalReworkRequestedBy: null,
+          technicalReworkRequestedAt: null,
           rejectedReason: null,
           rejectedBy: null,
           rejectedAt: null,
@@ -5376,16 +5400,16 @@
                     <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : role === 'legal' ? `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
-                    <button class="stage-btn verification" data-action="legalApprove" data-id="${lead.id}" ${isLegalSubmitted ? 'disabled' : ''}>⚖️ Approve</button>
-                    <button class="stage-btn deny" data-action="legalDeny" data-id="${lead.id}" ${isLegalSubmitted ? 'disabled' : ''}>⚖️ Deny</button>
-                    <button class="stage-btn ack" data-action="legalSubmit" data-id="${lead.id}" ${lead.legalStatus !== 'approved' ? 'disabled' : ''}>📤 Submit</button>
+                    <button class="stage-btn verification" data-action="legalApprove" data-id="${lead.id}" ${!['NEW','LEGAL_REVIEW','LEGAL_REWORK'].includes(lead.status || 'NEW') ? 'disabled' : ''}>⚖️ Approve</button>
+                    <button class="stage-btn deny" data-action="legalDeny" data-id="${lead.id}" ${!['NEW','LEGAL_REVIEW','LEGAL_REWORK'].includes(lead.status || 'NEW') ? 'disabled' : ''}>⚖️ Deny</button>
+                    <button class="stage-btn ack" data-action="legalSubmit" data-id="${lead.id}" ${lead.legalStatus !== 'approved' || !['NEW','LEGAL_REVIEW','LEGAL_REWORK'].includes(lead.status || 'NEW') ? 'disabled' : ''}>📤 Submit</button>
                     <button class="stage-btn" data-action="legalReport" data-id="${lead.id}" style="color:#6a9ad4;">📋 Report</button>
                     <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : role === 'technical' ? `
                     <button class="stage-btn" data-action="view" data-id="${lead.id}">👁️ View</button>
-                    <button class="stage-btn verification" data-action="technicalApprove" data-id="${lead.id}" ${isTechnicalSubmitted ? 'disabled' : ''}>🔧 Approve</button>
-                    <button class="stage-btn deny" data-action="technicalDeny" data-id="${lead.id}" ${isTechnicalSubmitted ? 'disabled' : ''}>🔧 Deny</button>
-                    <button class="stage-btn ack" data-action="technicalSubmit" data-id="${lead.id}" ${lead.technicalStatus !== 'approved' ? 'disabled' : ''}>📤 Submit</button>
+                    <button class="stage-btn verification" data-action="technicalApprove" data-id="${lead.id}" ${!['TECHNICAL_REVIEW','TECHNICAL_REWORK'].includes(lead.status || 'NEW') ? 'disabled' : ''}>🔧 Approve</button>
+                    <button class="stage-btn deny" data-action="technicalDeny" data-id="${lead.id}" ${!['TECHNICAL_REVIEW','TECHNICAL_REWORK'].includes(lead.status || 'NEW') ? 'disabled' : ''}>🔧 Deny</button>
+                    <button class="stage-btn ack" data-action="technicalSubmit" data-id="${lead.id}" ${lead.technicalStatus !== 'approved' || !['TECHNICAL_REVIEW','TECHNICAL_REWORK'].includes(lead.status || 'NEW') ? 'disabled' : ''}>📤 Submit</button>
                     <button class="stage-btn" data-action="technicalReport" data-id="${lead.id}" style="color:#d4a86a;">📋 Report</button>
                     <button class="stage-btn wa-btn" data-action="whatsapp" data-id="${lead.id}" style="color:#25D366; border-color:rgba(37,211,102,0.35);">🟢 WhatsApp</button>
                   ` : role === 'credit' ? `
@@ -5452,16 +5476,7 @@
           renderPipeline();
         } else if (action === 'legalSubmit') {
           if (lead.legalStatus === 'approved' && !lead.legalSubmitted) {
-            lead.legalSubmitted = true;
-            lead.legalSubmittedDate = new Date().toISOString();
-            lead.stage = 'Legal Submitted';
-            addFeed(`📤 Legal submitted for ${lead.borrower.name}`);
-            if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
-              lead.stage = 'Ready for Admin Approval';
-              addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
-            }
-            persistAll();
-            renderPipeline();
+            window.legalQuickSubmit(lead.id);
           } else {
             alert('⚠️ Please approve the lead first before submitting.');
           }
@@ -5479,16 +5494,7 @@
           renderPipeline();
         } else if (action === 'technicalSubmit') {
           if (lead.technicalStatus === 'approved' && !lead.technicalSubmitted) {
-            lead.technicalSubmitted = true;
-            lead.technicalSubmittedDate = new Date().toISOString();
-            lead.stage = 'Technical Submitted';
-            addFeed(`📤 Technical submitted for ${lead.borrower.name}`);
-            if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
-              lead.stage = 'Ready for Admin Approval';
-              addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
-            }
-            persistAll();
-            renderPipeline();
+            window.technicalQuickSubmit(lead.id);
           } else {
             alert('⚠️ Please approve the lead first before submitting.');
           }
@@ -5533,13 +5539,16 @@
       function openLegalReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
-        const editable = currentRole === 'legal' && !lead.legalSubmitted;
+        const status = lead.status || 'NEW';
+        const editable = currentRole === 'legal' && ['NEW','LEGAL_REVIEW','LEGAL_REWORK'].includes(status);
+        const adminCanRework = currentRole === 'owner' && lead.legalSubmitted && !['APPROVED','REJECTED'].includes(status);
         detailView.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-weight:600; color:#6a9ad4;">⚖️ Legal Evaluation Report</span>
-            <span class="badge badge-legal">Legal</span>
+            <span class="badge badge-legal">${currentRole === 'owner' ? 'ADMIN — FULL ACCESS' : 'Legal'}</span>
           </div>
           <div class="report-embed">
+            ${status === 'LEGAL_REWORK' && lead.legalReworkReason ? `<div class="report-section" style="background:rgba(212,168,74,0.08); border:1px solid rgba(212,168,74,0.3); border-radius:8px; padding:8px;"><div class="report-label">↩️ Admin sent this back for rework</div><div class="report-value">${escapeHtml(lead.legalReworkReason)}</div></div>` : ''}
             <div class="report-section"><div class="report-label">Borrower</div><div class="report-value">${escapeHtml(lead.borrower.name)}</div></div>
             <div class="report-section"><div class="report-label">CIBIL Score</div><div class="report-value">${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})</div></div>
             <div class="report-section"><div class="report-label">Property Address</div><div class="report-value">${escapeHtml(lead.property?.address || 'N/A')}</div></div>
@@ -5556,11 +5565,16 @@
               <textarea id="legalRecommendationInput" placeholder="Your recommendation to Admin — proceed, proceed with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.legalRecommendation || '')}</textarea>
             </div>
             ${editable ? `<button class="btn-secondary btn-sm" onclick="legalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button>` : ''}
-            ${lead.legalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#6a9ad4;">✅ ${new Date(lead.legalSubmittedDate).toLocaleDateString()}</div></div>` : ''}
+            ${lead.legalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#6a9ad4;">✅ ${lead.legalSubmittedBy || ''} — ${lead.legalSubmittedDate ? new Date(lead.legalSubmittedDate).toLocaleDateString() : ''}</div></div>` : ''}
             <div class="report-actions">
-              ${currentRole === 'legal' && lead.legalStatus !== 'approved' && !lead.legalSubmitted ? `<button class="btn-approve" onclick="legalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="legalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
-              ${currentRole === 'legal' && lead.legalStatus === 'approved' && !lead.legalSubmitted ? `<button class="btn-submit" onclick="legalQuickSubmit(${lead.id})">📤 Submit to Admin</button>` : ''}
+              ${currentRole === 'legal' && lead.legalStatus !== 'approved' && editable ? `<button class="btn-approve" onclick="legalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="legalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
+              ${currentRole === 'legal' && lead.legalStatus === 'approved' && editable ? `<button class="btn-submit" onclick="legalQuickSubmit(${lead.id})">📤 Submit to Next Stage</button>` : ''}
             </div>
+            ${adminCanRework ? `
+              <div style="margin-top:14px; border-top:1px solid rgba(255,215,0,0.15); padding-top:10px;">
+                <button class="btn-secondary" onclick="adminSendLegalForRework(${lead.id})">↩️ Send Legal for Rework</button>
+              </div>
+            ` : ''}
           </div>
         `;
       }
@@ -5577,13 +5591,17 @@
       function openTechnicalReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
-        const editable = currentRole === 'technical' && !lead.technicalSubmitted;
+        const status = lead.status || 'NEW';
+        const editable = currentRole === 'technical' && ['TECHNICAL_REVIEW','TECHNICAL_REWORK'].includes(status);
+        const adminCanRework = currentRole === 'owner' && lead.technicalSubmitted && !['APPROVED','REJECTED'].includes(status);
         detailView.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-weight:600; color:#d4a86a;">🔧 Technical Evaluation Report</span>
-            <span class="badge badge-technical">Technical</span>
+            <span class="badge badge-technical">${currentRole === 'owner' ? 'ADMIN — FULL ACCESS' : 'Technical'}</span>
           </div>
           <div class="report-embed">
+            ${status === 'TECHNICAL_REWORK' && lead.technicalReworkReason ? `<div class="report-section" style="background:rgba(212,168,74,0.08); border:1px solid rgba(212,168,74,0.3); border-radius:8px; padding:8px;"><div class="report-label">↩️ Admin sent this back for rework</div><div class="report-value">${escapeHtml(lead.technicalReworkReason)}</div></div>` : ''}
+            ${status === 'NEW' || status === 'LEGAL_REVIEW' || status === 'LEGAL_REWORK' ? `<div class="report-section" style="background:rgba(106,154,212,0.08); border:1px solid rgba(106,154,212,0.3); border-radius:8px; padding:8px;"><div class="report-label">⏳ Waiting on Legal</div><div class="report-value">Technical review opens once Legal submits their assessment.</div></div>` : ''}
             <div class="report-section"><div class="report-label">Borrower</div><div class="report-value">${escapeHtml(lead.borrower.name)}</div></div>
             <div class="report-section"><div class="report-label">CIBIL Score</div><div class="report-value">${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})</div></div>
             <div class="report-section"><div class="report-label">Property Address</div><div class="report-value">${escapeHtml(lead.property?.address || 'N/A')}</div></div>
@@ -5601,11 +5619,16 @@
               <textarea id="technicalRecommendationInput" placeholder="Your recommendation to Admin — proceed, proceed with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.technicalRecommendation || '')}</textarea>
             </div>
             ${editable ? `<button class="btn-secondary btn-sm" onclick="technicalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button>` : ''}
-            ${lead.technicalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#d4a86a;">✅ ${new Date(lead.technicalSubmittedDate).toLocaleDateString()}</div></div>` : ''}
+            ${lead.technicalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#d4a86a;">✅ ${lead.technicalSubmittedBy || ''} — ${lead.technicalSubmittedDate ? new Date(lead.technicalSubmittedDate).toLocaleDateString() : ''}</div></div>` : ''}
             <div class="report-actions">
-              ${currentRole === 'technical' && lead.technicalStatus !== 'approved' && !lead.technicalSubmitted ? `<button class="btn-approve" onclick="technicalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="technicalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
-              ${currentRole === 'technical' && lead.technicalStatus === 'approved' && !lead.technicalSubmitted ? `<button class="btn-submit" onclick="technicalQuickSubmit(${lead.id})">📤 Submit to Admin</button>` : ''}
+              ${currentRole === 'technical' && lead.technicalStatus !== 'approved' && editable ? `<button class="btn-approve" onclick="technicalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="technicalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
+              ${currentRole === 'technical' && lead.technicalStatus === 'approved' && editable ? `<button class="btn-submit" onclick="technicalQuickSubmit(${lead.id})">📤 Submit to Next Stage</button>` : ''}
             </div>
+            ${adminCanRework ? `
+              <div style="margin-top:14px; border-top:1px solid rgba(255,215,0,0.15); padding-top:10px;">
+                <button class="btn-secondary" onclick="adminSendTechnicalForRework(${lead.id})">↩️ Send Technical for Rework</button>
+              </div>
+            ` : ''}
           </div>
         `;
       }
@@ -5847,20 +5870,24 @@
           renderPipeline();
           showDetail(lead); }
       };
-      window.legalQuickSubmit = function(id) {
+      window.legalQuickSubmit = async function(id) {
         const lead = leads.find(l => l.id === id);
-        if (lead && lead.legalStatus === 'approved' && !lead.legalSubmitted) {
-          lead.legalSubmitted = true;
-          lead.legalSubmittedDate = new Date().toISOString();
-          lead.stage = 'Legal Submitted';
-          addFeed(`📤 Legal submitted for ${lead.borrower.name}`);
-          if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
-            lead.stage = 'Ready for Admin Approval';
-            addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
-          }
-          persistAll();
+        if (!lead || lead.legalStatus !== 'approved') return;
+        const observation = document.getElementById('legalObservationInput')?.value.trim() || lead.legalObservation || '';
+        const recommendation = document.getElementById('legalRecommendationInput')?.value.trim() || lead.legalRecommendation || '';
+        try {
+          const { error } = await sb.rpc('legal_submit_assessment', {
+            p_lead_id: id, p_legal_status: 'approved', p_observation: observation, p_recommendation: recommendation
+          });
+          if (error) throw error;
+          const { data: row } = await sb.from('leads').select('*').eq('id', id).single();
+          if (row) Object.assign(lead, rowToLead(row));
+          addFeed(`📤 Legal assessment submitted for ${lead.borrower.name}`);
+          saveToStorage(STORAGE_KEYS.leads, leads);
           renderPipeline();
           showDetail(lead);
+        } catch (e) {
+          alert('⚠️ Could not submit: ' + (e.message || e));
         }
       };
       window.technicalQuickApprove = function(id) {
@@ -5881,20 +5908,62 @@
           renderPipeline();
           showDetail(lead); }
       };
-      window.technicalQuickSubmit = function(id) {
+      window.technicalQuickSubmit = async function(id) {
         const lead = leads.find(l => l.id === id);
-        if (lead && lead.technicalStatus === 'approved' && !lead.technicalSubmitted) {
-          lead.technicalSubmitted = true;
-          lead.technicalSubmittedDate = new Date().toISOString();
-          lead.stage = 'Technical Submitted';
-          addFeed(`📤 Technical submitted for ${lead.borrower.name}`);
-          if (lead.legalSubmitted && lead.technicalSubmitted && lead.creditSubmitted) {
-            lead.stage = 'Ready for Admin Approval';
-            addFeed(`📋 ${lead.borrower.name} ready for Admin final approval`);
-          }
-          persistAll();
+        if (!lead || lead.technicalStatus !== 'approved') return;
+        const observation = document.getElementById('technicalObservationInput')?.value.trim() || lead.technicalObservation || '';
+        const recommendation = document.getElementById('technicalRecommendationInput')?.value.trim() || lead.technicalRecommendation || '';
+        try {
+          const { error } = await sb.rpc('technical_submit_assessment', {
+            p_lead_id: id, p_technical_status: 'approved', p_observation: observation, p_recommendation: recommendation
+          });
+          if (error) throw error;
+          const { data: row } = await sb.from('leads').select('*').eq('id', id).single();
+          if (row) Object.assign(lead, rowToLead(row));
+          addFeed(`📤 Technical assessment submitted for ${lead.borrower.name}`);
+          saveToStorage(STORAGE_KEYS.leads, leads);
           renderPipeline();
           showDetail(lead);
+        } catch (e) {
+          alert('⚠️ Could not submit: ' + (e.message || e));
+        }
+      };
+
+      window.adminSendLegalForRework = async function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (!lead) return;
+        const reason = prompt(`Rework instructions for Legal on ${lead.borrower.name}'s case:`, '');
+        if (!reason || !reason.trim()) { alert('Rework instructions are required.'); return; }
+        try {
+          const { error } = await sb.rpc('admin_send_legal_for_rework', { p_lead_id: id, p_reason: reason.trim() });
+          if (error) throw error;
+          const { data: row } = await sb.from('leads').select('*').eq('id', id).single();
+          if (row) Object.assign(lead, rowToLead(row));
+          addFeed(`↩️ Admin sent ${lead.borrower.name}'s case back to Legal for rework`);
+          saveToStorage(STORAGE_KEYS.leads, leads);
+          renderPipeline();
+          showDetail(lead);
+        } catch (e) {
+          alert('⚠️ Could not send for rework: ' + (e.message || e));
+        }
+      };
+
+      window.adminSendTechnicalForRework = async function(id) {
+        const lead = leads.find(l => l.id === id);
+        if (!lead) return;
+        const reason = prompt(`Rework instructions for Technical on ${lead.borrower.name}'s case:`, '');
+        if (!reason || !reason.trim()) { alert('Rework instructions are required.'); return; }
+        try {
+          const { error } = await sb.rpc('admin_send_technical_for_rework', { p_lead_id: id, p_reason: reason.trim() });
+          if (error) throw error;
+          const { data: row } = await sb.from('leads').select('*').eq('id', id).single();
+          if (row) Object.assign(lead, rowToLead(row));
+          addFeed(`↩️ Admin sent ${lead.borrower.name}'s case back to Technical for rework`);
+          saveToStorage(STORAGE_KEYS.leads, leads);
+          renderPipeline();
+          showDetail(lead);
+        } catch (e) {
+          alert('⚠️ Could not send for rework: ' + (e.message || e));
         }
       };
 
