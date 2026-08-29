@@ -3641,6 +3641,40 @@
         return true;
       }
 
+      // Final sanction records — written by Admin Panel once Legal + Technical + Credit
+      // are all approved (SOLITAIRE workflow section 11).
+      async function loadSanctionsFromSupabase() {
+        if (!sb) return false;
+        const { data, error } = await sb.from('sanctions').select('*').order('created_at', { ascending: false });
+        if (error) {
+          console.error('Sanctions load error:', describeSbError(error), error);
+          return false;
+        }
+        sanctions = data || [];
+        return true;
+      }
+
+      // Legal / Technical / Credit evaluation reports from the evaluation portal.
+      async function loadEvaluationReportsFromSupabase() {
+        if (!sb) return false;
+        const { data, error } = await sb.from('evaluation_reports').select('*').order('updated_at', { ascending: false });
+        if (error) {
+          console.error('Evaluation reports load error:', describeSbError(error), error);
+          return false;
+        }
+        evaluationReports = data || [];
+        return true;
+      }
+
+      // Re-renders whatever screen is currently visible so live updates show up
+      // immediately instead of requiring a manual tab switch / refresh.
+      function refreshLiveScreens() {
+        // Pipeline list always reflects the latest data when visible
+        if (typeof renderPipeline === 'function') renderPipeline();
+        const activeScreen = document.querySelector('.screen.active')?.id;
+        if (activeScreen === 'screen-reports' && typeof renderReports === 'function') renderReports();
+      }
+
       function subscribeToLeadChanges() {
         if (!sb) return;
         sb.channel('leads-live-sync')
@@ -3651,9 +3685,23 @@
                 leads = data.map(rowToLead);
                 nextId = Math.max(nextId, ...(leads.length ? leads.map(l => l.id) : [0])) + 1;
                 saveToStorage(STORAGE_KEYS.leads, leads);
-                if (typeof renderPipeline === 'function') renderPipeline();
+                refreshLiveScreens();
               }
             });
+          })
+          .subscribe();
+
+        // Live sync: final sanctions (written by Admin Panel)
+        sb.channel('sanctions-live-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'sanctions' }, () => {
+            loadSanctionsFromSupabase().then(() => refreshLiveScreens());
+          })
+          .subscribe();
+
+        // Live sync: legal / technical / credit evaluation reports
+        sb.channel('evaluation-reports-live-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'evaluation_reports' }, () => {
+            loadEvaluationReportsFromSupabase().then(() => refreshLiveScreens());
           })
           .subscribe();
       }
@@ -3743,6 +3791,26 @@
       // 2. INITIALIZE DATA
       // ================================================================
       let leads = loadFromStorage(STORAGE_KEYS.leads, []);
+      // Live data from the Admin Panel / Legal-Technical-Credit evaluation portal.
+      // These are populated by loadSanctionsFromSupabase() / loadEvaluationReportsFromSupabase()
+      // and kept fresh via realtime subscriptions in subscribeToLeadChanges().
+      let sanctions = [];
+      let evaluationReports = [];
+
+      function getSanctionForLead(leadId) {
+        return sanctions.find(s => s.lead_id === leadId) || null;
+      }
+
+      function getEvaluationReportsForLead(leadId) {
+        return evaluationReports.filter(r => r.lead_id === leadId);
+      }
+
+      function getEvaluationReportForLead(leadId, reportType) {
+        // Most recent report of a given type (legal / technical / credit) for a lead
+        const rows = evaluationReports.filter(r => r.lead_id === leadId && r.report_type === reportType);
+        if (!rows.length) return null;
+        return rows.reduce((latest, r) => (new Date(r.updated_at || r.created_at) > new Date(latest.updated_at || latest.created_at) ? r : latest));
+      }
       // NOTE: this seed is a local/offline fallback only, used when Supabase Auth is
       // unreachable (see login()). Staff accounts authenticate via Supabase Auth in
       // normal operation, so these are NOT live credentials — they exist purely so
@@ -3963,6 +4031,18 @@
         const conversionRate = total > 0 ? ((approved / total) * 100).toFixed(1) : '0.0';
         const avgTicket = total > 0 ? totalAmount / total : 0;
 
+        // Live figures from the sanctions / evaluation_reports tables (Admin Panel + evaluation portal)
+        const scopedLeadIds = new Set(scopedLeads.map(l => l.id));
+        const scopedSanctions = sanctions.filter(s => scopedLeadIds.has(s.lead_id));
+        const totalSanctioned = scopedSanctions.reduce((s, x) => s + (x.sanction_amount || 0), 0);
+        const sanctionedCount = scopedSanctions.length;
+        const avgSanctioned = sanctionedCount > 0 ? totalSanctioned / sanctionedCount : 0;
+
+        const scopedReports = evaluationReports.filter(r => scopedLeadIds.has(r.lead_id));
+        const byReportStatus = {};
+        scopedReports.forEach(r => { const s = r.status || 'draft'; byReportStatus[s] = (byReportStatus[s] || 0) + 1; });
+        const maxReportStatus = Math.max(1, ...Object.values(byReportStatus));
+
         const stageOrder = ['New', 'Legal Submitted', 'Technical Submitted', 'Legal Approved', 'Technical Approved',
           'Ready for Admin Approval', 'Approved', 'Legal Declined', 'Technical Declined', 'Declined'];
         const byStage = {};
@@ -3994,9 +4074,21 @@
             <div class="card-title"><i class="fas fa-tags"></i> By Loan Type</div>
             ${Object.entries(byLoanType).sort((a, b) => b[1] - a[1]).map(([t, c]) => barRow(t, c, maxLoanType)).join('') || '<div style="color:#6a5f48; font-size:12px;">No leads yet.</div>'}
           </div>
-          <div class="card" style="margin-bottom:6px;">
+          <div class="card" style="margin-bottom:12px;">
             <div class="card-title"><i class="fas fa-rupee-sign"></i> Total Pipeline Value</div>
             <div style="font-size:20px; font-weight:700; color:#c9a84c; text-align:center; padding:6px 0;">${fmtCr(totalAmount)}</div>
+          </div>
+          <div class="card" style="margin-bottom:12px;">
+            <div class="card-title"><i class="fas fa-gem"></i> Final Sanctions (live from Admin Panel)</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              ${statCard('Sanctioned Leads', sanctionedCount)}
+              ${statCard('Total Sanctioned', fmtCr(totalSanctioned))}
+              ${statCard('Avg Sanctioned', fmtCr(avgSanctioned))}
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:6px;">
+            <div class="card-title"><i class="fas fa-file-signature"></i> Evaluation Reports by Status</div>
+            ${Object.entries(byReportStatus).sort((a, b) => b[1] - a[1]).map(([s, c]) => barRow(s, c, maxReportStatus)).join('') || '<div style="color:#6a5f48; font-size:12px;">No evaluation reports yet.</div>'}
           </div>
         `;
 
@@ -4053,7 +4145,10 @@
         }
 
         container.innerHTML = html;
-        document.getElementById('refreshReportsBtn')?.addEventListener('click', renderReports);
+        document.getElementById('refreshReportsBtn')?.addEventListener('click', async () => {
+          await Promise.all([loadLeadsFromSupabase(), loadSanctionsFromSupabase(), loadEvaluationReportsFromSupabase()]);
+          renderReports();
+        });
       }
 
       function addFeed(msg) {
@@ -4290,6 +4385,7 @@
           foundUser = { password: row.password, role: row.role, name: row.name, mobile: row.mobile, status: row.status };
           users[foundKey] = foundUser;
           await loadLeadsFromSupabase();
+          await Promise.all([loadSanctionsFromSupabase(), loadEvaluationReportsFromSupabase()]);
           await loadFromSupabase();
         } else {
           // Fallback: local/offline check (used only if Supabase is unreachable,
@@ -5370,6 +5466,17 @@
           const isTechnicalSubmitted = lead.technicalSubmitted || false;
           const cibilInfo = lead.borrower.cibilBand || '—';
 
+          // Live data from the sanctions / evaluation_reports tables (Admin Panel + evaluation portal)
+          const sanction = getSanctionForLead(lead.id);
+          const legalReport = getEvaluationReportForLead(lead.id, 'legal');
+          const technicalReport = getEvaluationReportForLead(lead.id, 'technical');
+          const creditReport = getEvaluationReportForLead(lead.id, 'credit');
+          const reportBadge = (label, report) => {
+            if (!report) return '';
+            const color = report.status === 'approved' ? '#6ad49a' : report.status === 'rejected' ? '#d46a6a' : report.status === 'submitted' ? '#6a9ad4' : '#8a7f66';
+            return `<span style="font-size:8px; color:${color};">${label} ${escapeHtml(report.status || 'draft')}</span>`;
+          };
+
           return `
             <div class="pipeline-item" data-id="${lead.id}">
               <div>
@@ -5386,6 +5493,10 @@
                 ${isLegalSubmitted ? `<span style="font-size:8px; color:#6a9ad4;">📤 Legal Submitted</span>` : ''}
                 ${isTechnicalSubmitted ? `<span style="font-size:8px; color:#d4a86a;">📤 Tech Submitted</span>` : ''}
                 ${lead.creditSubmitted ? `<span style="font-size:8px; color:#c9a84c;">📤 Credit Submitted</span>` : ''}
+                ${reportBadge('📋 Legal report:', legalReport)}
+                ${reportBadge('📋 Tech report:', technicalReport)}
+                ${reportBadge('📋 Credit report:', creditReport)}
+                ${sanction ? `<div style="font-size:9px; color:#c9a84c; margin-top:2px;">💎 Sanctioned ₹${(sanction.sanction_amount || 0).toLocaleString('en-IN')} · ${escapeHtml(sanction.status || 'sanctioned')}${sanction.sanction_date ? ' · ' + escapeHtml(sanction.sanction_date) : ''}</div>` : ''}
               </div>
               <div style="text-align:right;">
                 <span class="badge ${badgeClass}" style="font-size:10px;">${escapeHtml(stage)}</span>
