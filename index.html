@@ -4881,7 +4881,15 @@
       // 9. TEAM MANAGEMENT (Admin)
       // ================================================================
       function updateTeamManagement() {
-        if (currentRole !== 'owner') return;
+        // Only Admin (owner) is authorized to approve/deny/terminate team members.
+        // Actively remove the card for every other role (Business Associate, Legal,
+        // Technical, Credit) instead of just skipping creation — this also covers
+        // the case where an admin's session already rendered the card and a
+        // different role logs in afterwards without a full page reload.
+        if (currentRole !== 'owner') {
+          document.getElementById('teamManagementSection')?.remove();
+          return;
+        }
         let teamSection = document.getElementById('teamManagementSection');
         if (!teamSection) {
           const pipelineScreen = document.getElementById('screen-pipeline');
