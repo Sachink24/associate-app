@@ -4899,6 +4899,10 @@
           card.innerHTML = `
             <div class="card-title"><i class="fas fa-users-cog"></i> Team Management</div>
             <div style="margin-bottom:12px;">
+              <h4 style="color:#7ec98f; font-size:13px; margin-bottom:6px;"><i class="fas fa-handshake"></i> Business Associates</h4>
+              <div id="businessTeamList"></div>
+            </div>
+            <div style="margin-bottom:12px;">
               <h4 style="color:#6a9ad4; font-size:13px; margin-bottom:6px;"><i class="fas fa-gavel"></i> Legal Team</h4>
               <div id="legalTeamList"></div>
             </div>
@@ -4918,10 +4922,11 @@
       }
 
       function renderTeamLists(container) {
+        const businessList = container.querySelector('#businessTeamList');
         const legalList = container.querySelector('#legalTeamList');
         const technicalList = container.querySelector('#technicalTeamList');
         const creditList = container.querySelector('#creditTeamList');
-        if (!legalList || !technicalList || !creditList) return;
+        if (!businessList || !legalList || !technicalList || !creditList) return;
 
         function teamCardsHtml(team, teamKey) {
           return team.map((member, index) => `
@@ -4949,6 +4954,7 @@
           `).join('');
         }
 
+        businessList.innerHTML = teamCardsHtml(businessAssociates, 'business');
         legalList.innerHTML = teamCardsHtml(legalTeam, 'legal');
         technicalList.innerHTML = teamCardsHtml(technicalTeam, 'technical');
         creditList.innerHTML = teamCardsHtml(creditTeam, 'credit');
@@ -4967,7 +4973,8 @@
       });
 
       function handleTeamAction(team, idx, action) {
-        const teamArray = team === 'legal' ? legalTeam : team === 'credit' ? creditTeam : technicalTeam;
+        const teamArray = team === 'legal' ? legalTeam : team === 'credit' ? creditTeam :
+          team === 'business' ? businessAssociates : technicalTeam;
         const member = teamArray[idx];
         if (!member) return;
         const userEmail = member.email;
@@ -4994,6 +5001,10 @@
         persistAll();
         updateTeamManagement();
         updateUIForRole();
+        updateBASelector();
+        updateLegalSelector();
+        updateTechnicalSelector();
+        updateCreditSelector();
         renderPipeline();
       }
 
