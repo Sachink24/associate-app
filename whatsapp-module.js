@@ -255,7 +255,8 @@ We appreciate your trust. 🙏
     allow_associates: true,
     allow_credit_team: true,
     allow_legal_team: true,
-    allow_technical_team: true
+    allow_technical_team: true,
+    bot_whatsapp_number: "15551770472"
   };
 
   // ---------------------------------------------------------------------
@@ -435,6 +436,7 @@ We appreciate your trust. 🙏
   // ---------------------------------------------------------------------
   function role() { return (bridge() && bridge().getCurrentRole()) || "guest"; }
   function isAdmin() { return role() === "owner"; }
+  function isBusiness() { return role() === "business"; }
   function canSend() {
     const r = role();
     if (r === "owner") return true;
@@ -650,6 +652,13 @@ We appreciate your trust. 🙏
       .wa-editor-actions button { flex:1; padding:10px; border-radius:30px; border:none; font-weight:600; cursor:pointer; font-size:12.5px; }
       .wa-save { background:#c9a84c; color:#0a0a0f; }
       .wa-discard { background:#2a2a3e; color:#c8bca8; }
+      .wa-referral-code { font-size:26px; font-weight:700; letter-spacing:4px; color:#c9a84c; text-align:center;
+        background:#0f0f18; border:1px solid rgba(255,215,0,0.2); border-radius:14px; padding:14px 10px; margin-bottom:10px; }
+      .wa-referral-qr { display:flex; justify-content:center; margin:14px 0; }
+      .wa-referral-qr img { border-radius:12px; border:6px solid #ffffff; }
+      .wa-referral-link-row { display:flex; gap:6px; }
+      .wa-referral-link-row input { flex:1; background:#0f0f18; border:1px solid rgba(255,215,0,0.15); color:#f0e6d0;
+        border-radius:8px; padding:8px 10px; font-size:11px; }
     `;
     document.head.appendChild(style);
   }
@@ -825,7 +834,7 @@ We appreciate your trust. 🙏
 
   async function openHub() {
     if (!dataReady) await ensureInit();
-    hubTab = isAdmin() ? "overview" : "history";
+    hubTab = isAdmin() ? "overview" : (isBusiness() ? "referral" : "history");
     editingTemplate = null;
     renderHub();
     document.getElementById("waHubOverlay").classList.add("show");
@@ -842,7 +851,9 @@ We appreciate your trust. 🙏
     const tabs = admin
       ? [tabButton("overview", "📊 Overview"), tabButton("templates", "📋 Templates"),
          tabButton("automation", "⚙️ Automation"), tabButton("history", "🕘 History (All)")]
-      : [tabButton("history", "🕘 My History")];
+      : isBusiness()
+        ? [tabButton("referral", "🔗 My Referral Link"), tabButton("history", "🕘 My History")]
+        : [tabButton("history", "🕘 My History")];
 
     card.innerHTML = `
       <div class="wa-head">
@@ -861,6 +872,7 @@ We appreciate your trust. 🙏
     if (hubTab === "overview") body.innerHTML = await overviewHtml();
     else if (hubTab === "templates" && admin) { body.innerHTML = templatesHtml(); wireTemplatesTab(); }
     else if (hubTab === "automation" && admin) { body.innerHTML = automationHtml(); wireAutomationTab(); }
+    else if (hubTab === "referral" && isBusiness()) { body.innerHTML = await referralHtml(); wireReferralTab(); }
     else if (hubTab === "history") { body.innerHTML = await historyHtml(); wireHistoryTab(); }
   }
 
@@ -896,6 +908,77 @@ We appreciate your trust. 🙏
         <div class="r2">${esc(m.application_id || "—")} · ${esc(m.template_used || "Custom")} · ${esc(m.application_stage || "—")}</div>
         <div class="r2">${esc(m.mobile_number || "")} · by ${esc(m.sent_by || "—")} · ${new Date(m.sent_at).toLocaleString("en-IN")}</div>
       </div>`;
+  }
+
+  // ---- My Referral Link tab (Business Associate only) ----
+  let myReferralRow = null; // cached { referral_code, email, NAME } for the logged-in BA
+
+  async function loadMyReferralRow() {
+    const sb = sbClient();
+    const email = bridge() ? bridge().getCurrentUser() : null;
+    if (!sb || !email) return null;
+    const { data, error } = await sb
+      .from("business_associates")
+      .select('email, "NAME", referral_code, status')
+      .eq("email", email)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data;
+  }
+
+  function buildReferralLink(code) {
+    const botNumber = (settingsCache && settingsCache.bot_whatsapp_number) || DEFAULT_SETTINGS.bot_whatsapp_number;
+    const text = `Hi, I'm interested in a loan. Referral: ${code}`;
+    return `https://wa.me/${botNumber}?text=${encodeURIComponent(text)}`;
+  }
+
+  async function referralHtml() {
+    if (!myReferralRow) myReferralRow = await loadMyReferralRow();
+
+    if (!myReferralRow || !myReferralRow.referral_code) {
+      return `<div class="wa-empty">We couldn't find your referral code. Please contact Admin — this is generated automatically for every active Business Associate.</div>`;
+    }
+    if (myReferralRow.status !== "active") {
+      return `<div class="wa-empty">Your Business Associate account isn't active, so your referral link is paused. Contact Admin.</div>`;
+    }
+
+    const link = buildReferralLink(myReferralRow.referral_code);
+    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(link)}`;
+
+    return `
+      <div class="wa-field"><label>Your personal referral code</label></div>
+      <div class="wa-referral-code">${esc(myReferralRow.referral_code)}</div>
+      <div class="wa-note">Share this link or QR code with a prospective client. When they message us on WhatsApp through it, a lead is created automatically and assigned straight to you — no round-robin.</div>
+      <div class="wa-referral-qr"><img src="${qrSrc}" alt="Referral QR code" width="220" height="220"/></div>
+      <div class="wa-field"><label>Your referral link</label></div>
+      <div class="wa-referral-link-row">
+        <input type="text" id="waReferralLinkInput" readonly value="${link.replace(/"/g, '&quot;')}"/>
+        <button class="wa-tab" id="waReferralCopyBtn">Copy Link</button>
+      </div>
+      <button class="wa-tab" id="waReferralOpenBtn" style="border-color:#25D366;color:#25D366;margin-top:8px;">Open in WhatsApp to test</button>
+      <div class="wa-note">If a client edits the pre-filled message and removes the referral code, the lead falls back to normal assignment — ask them to send the message as-is.</div>
+    `;
+  }
+
+  function wireReferralTab() {
+    const copyBtn = document.getElementById("waReferralCopyBtn");
+    const openBtn = document.getElementById("waReferralOpenBtn");
+    const input = document.getElementById("waReferralLinkInput");
+    if (copyBtn && input) {
+      copyBtn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(input.value);
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => { copyBtn.textContent = "Copy Link"; }, 1500);
+        } catch (e) {
+          input.select();
+          document.execCommand("copy");
+        }
+      };
+    }
+    if (openBtn && input) {
+      openBtn.onclick = () => window.open(input.value, "_blank");
+    }
   }
 
   // ---- Templates tab (admin only) ----
