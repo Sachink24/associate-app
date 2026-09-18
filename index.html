@@ -3541,10 +3541,18 @@
         try {
           const jobs = [];
           if (leads.length) jobs.push(sb.from('leads').upsert(leads.map(leadToRow), { onConflict: 'id' }));
-          if (businessAssociates.length) jobs.push(sb.from('business_associates').upsert(businessAssociates, { onConflict: 'email' }));
-          if (legalTeam.length) jobs.push(sb.from('legal_team').upsert(legalTeam, { onConflict: 'email' }));
-          if (technicalTeam.length) jobs.push(sb.from('technical_team').upsert(technicalTeam, { onConflict: 'email' }));
-          if (creditTeam.length) jobs.push(sb.from('credit_team').upsert(creditTeam, { onConflict: 'email' }));
+          // business_associates/legal_team/technical_team are admin-managed
+          // rosters (UPDATE is admin-only by RLS design) — only Admin's own
+          // session should ever push writes to them. Every other role only
+          // ever reads these arrays locally (for assignment dropdowns, etc.),
+          // so attempting to upsert them was guaranteed to fail with an RLS
+          // violation and was never actually needed.
+          if (currentRole === 'owner') {
+            if (businessAssociates.length) jobs.push(sb.from('business_associates').upsert(businessAssociates, { onConflict: 'email' }));
+            if (legalTeam.length) jobs.push(sb.from('legal_team').upsert(legalTeam, { onConflict: 'email' }));
+            if (technicalTeam.length) jobs.push(sb.from('technical_team').upsert(technicalTeam, { onConflict: 'email' }));
+            if (creditTeam.length) jobs.push(sb.from('credit_team').upsert(creditTeam, { onConflict: 'email' }));
+          }
           const results = await Promise.all(jobs);
           const firstError = results.map(r => r.error).find(Boolean);
           if (firstError) throw firstError;
