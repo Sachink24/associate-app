@@ -4972,30 +4972,35 @@
         handleTeamAction(team, idx, action);
       });
 
-      function handleTeamAction(team, idx, action) {
+      async function handleTeamAction(team, idx, action) {
         const teamArray = team === 'legal' ? legalTeam : team === 'credit' ? creditTeam :
           team === 'business' ? businessAssociates : technicalTeam;
         const member = teamArray[idx];
         if (!member) return;
         const userEmail = member.email;
         const user = users[userEmail];
+        let newUsersStatus = null, newUsersRole = null;
 
         if (action === 'approve') {
           member.status = 'active';
           if (user) user.status = 'active';
+          newUsersStatus = 'active';
           addFeed(`✅ ${member.name} (${team}) approved by Admin`);
         } else if (action === 'deny') {
           teamArray.splice(idx, 1);
           if (user) { user.status = 'terminated';
             user.role = 'customer'; }
+          newUsersStatus = 'terminated'; newUsersRole = 'customer';
           addFeed(`❌ ${member.name} (${team}) denied by Admin`);
         } else if (action === 'terminate') {
           member.status = 'terminated';
           if (user) user.status = 'terminated';
+          newUsersStatus = 'terminated';
           addFeed(`⛔ ${member.name} (${team}) terminated by Admin`);
         } else if (action === 'reactivate') {
           member.status = 'active';
           if (user) user.status = 'active';
+          newUsersStatus = 'active';
           addFeed(`🔄 ${member.name} (${team}) reactivated by Admin`);
         }
         persistAll();
@@ -5006,6 +5011,18 @@
         updateTechnicalSelector();
         updateCreditSelector();
         renderPipeline();
+
+        // persistAll() above only upserts the role-specific directory tables
+        // (business_associates/legal_team/technical_team/credit_team) — it
+        // never touches public.users, which is the table login() actually
+        // checks. Without this, "Approve" looked like it worked but the
+        // account stayed permanently stuck at "pending admin approval".
+        if (sb && newUsersStatus && userEmail) {
+          const patch = { status: newUsersStatus };
+          if (newUsersRole) patch.role = newUsersRole;
+          const { error } = await sb.from('users').update(patch).eq('email', userEmail);
+          if (error) console.error('Failed to sync users table status for', userEmail, error);
+        }
       }
 
       // ================================================================
