@@ -256,7 +256,7 @@ We appreciate your trust. 🙏
     allow_credit_team: true,
     allow_legal_team: true,
     allow_technical_team: true,
-    bot_whatsapp_number: "15551770472"
+    bot_whatsapp_number: "918356902635"
   };
 
   // ---------------------------------------------------------------------
