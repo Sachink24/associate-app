@@ -20,7 +20,7 @@
   // 0. CONSTANTS
   // ---------------------------------------------------------------------
   const T_TEMPLATES = "whatsapp_templates";
-  const T_MESSAGES = "whatsapp_messages";
+  const T_MESSAGES = "whatsapp_send_log";
   const T_SETTINGS = "whatsapp_settings";
 
   const LS_TEMPLATES = "sfm_wa_templates_v1";
