@@ -2214,10 +2214,28 @@
       </div>
       <div class="header-actions">
         <i class="fab fa-whatsapp" id="waHubIcon" title="WhatsApp Communication" style="color:#25D366; cursor:pointer;"></i>
+        <span style="position:relative; display:inline-block;">
+          <i class="fas fa-bell" id="notifBellIcon" title="Notifications" style="color:#c9a84c; cursor:pointer;"></i>
+          <span id="notifBadge" style="display:none; position:absolute; top:-7px; right:-9px; background:#d46a6a; color:#fff; font-size:10px; font-weight:700; min-width:16px; height:16px; border-radius:8px; padding:0 4px; align-items:center; justify-content:center; line-height:16px; text-align:center;">0</span>
+        </span>
         <i class="fas fa-search"></i>
         <i class="fas fa-key" id="changePasswordIcon" title="Change Password" style="color:#c9a84c; cursor:pointer;"></i>
         <i class="fas fa-sliders-h"></i>
         <i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS PANEL -->
+    <div class="share-overlay" id="notifOverlay">
+      <div class="share-card" id="notifCard" style="max-width:420px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h2 style="margin:0; font-size:16px;"><i class="fas fa-bell" style="color:#c9a84c;"></i> Notifications</h2>
+          <div>
+            <button class="btn-secondary btn-sm" id="notifMarkAllReadBtn" style="margin-right:6px;">Mark all read</button>
+            <span id="notifCloseBtn" style="cursor:pointer; font-size:20px; color:#c8bca8; padding:0 4px;">&times;</span>
+          </div>
+        </div>
+        <div id="notifList" style="max-height:60vh; overflow-y:auto;"></div>
       </div>
     </div>
 
@@ -4445,6 +4463,7 @@
         addFeed(`🔐 ${foundUser.name} (${currentRole}) logged in`);
         renderPipeline();
         updateBASelector();
+        initNotifications();
         updateLegalSelector();
         updateTechnicalSelector();
         updateCreditSelector();
@@ -7240,6 +7259,112 @@
           window.SFM_WA.openHub();
         }
       });
+
+      // ================================================================
+      // NOTIFICATIONS BELL
+      // ================================================================
+      let notifItems = [];
+      let notifPollTimer = null;
+
+      function timeAgo(iso) {
+        const diffMs = Date.now() - new Date(iso).getTime();
+        const mins = Math.floor(diffMs / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return mins + 'm ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + 'h ago';
+        return Math.floor(hrs / 24) + 'd ago';
+      }
+
+      async function loadNotifications() {
+        if (!sb || !currentUser) return;
+        try {
+          const { data, error } = await sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(30);
+          if (error) { console.error('Failed to load notifications:', error); return; }
+          notifItems = data || [];
+          updateNotifBadge();
+        } catch (e) {
+          console.error('Failed to load notifications:', e);
+        }
+      }
+
+      function updateNotifBadge() {
+        const unread = notifItems.filter(n => !n.is_read).length;
+        const badge = document.getElementById('notifBadge');
+        if (!badge) return;
+        if (unread > 0) {
+          badge.textContent = unread > 99 ? '99+' : String(unread);
+          badge.style.display = 'flex';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      function renderNotifList() {
+        const list = document.getElementById('notifList');
+        if (!list) return;
+        if (!notifItems.length) {
+          list.innerHTML = '<div class="wa-empty" style="padding:20px 0; text-align:center; color:#6a5f48;">No notifications yet.</div>';
+          return;
+        }
+        list.innerHTML = notifItems.map(n => `
+          <div class="notif-row" data-id="${n.id}" data-lead-id="${n.lead_id || ''}" style="padding:10px 8px; border-bottom:1px solid rgba(255,215,0,0.08); cursor:pointer; ${n.is_read ? 'opacity:0.6;' : 'background:rgba(201,168,76,0.06);'}">
+            <div style="display:flex; justify-content:space-between; gap:8px;">
+              <strong style="font-size:12.5px; color:#f0e6d0;">${escapeHtml(n.title)}</strong>
+              <span style="font-size:10px; color:#6a5f48; white-space:nowrap;">${timeAgo(n.created_at)}</span>
+            </div>
+            <div style="font-size:11.5px; color:#c8bca8; margin-top:3px;">${escapeHtml(n.message)}</div>
+          </div>
+        `).join('');
+        list.querySelectorAll('.notif-row').forEach(row => {
+          row.addEventListener('click', async () => {
+            const id = parseInt(row.dataset.id, 10);
+            const leadId = row.dataset.leadId ? parseInt(row.dataset.leadId, 10) : null;
+            await markNotifRead(id);
+            document.getElementById('notifOverlay').classList.remove('show');
+            if (leadId) {
+              const lead = leads.find(l => l.id === leadId);
+              if (lead) showDetail(lead);
+            }
+          });
+        });
+      }
+
+      async function markNotifRead(id) {
+        const item = notifItems.find(n => n.id === id);
+        if (item) item.is_read = true;
+        updateNotifBadge();
+        if (sb) {
+          const { error } = await sb.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', id);
+          if (error) console.error('Failed to mark notification read:', error);
+        }
+      }
+
+      async function markAllNotifsRead() {
+        notifItems.forEach(n => { n.is_read = true; });
+        updateNotifBadge();
+        renderNotifList();
+        if (sb) {
+          const { error } = await sb.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('is_read', false);
+          if (error) console.error('Failed to mark all notifications read:', error);
+        }
+      }
+
+      function initNotifications() {
+        loadNotifications();
+        if (notifPollTimer) clearInterval(notifPollTimer);
+        notifPollTimer = setInterval(loadNotifications, 45000);
+      }
+
+      document.getElementById('notifBellIcon')?.addEventListener('click', async function() {
+        await loadNotifications();
+        renderNotifList();
+        document.getElementById('notifOverlay').classList.add('show');
+      });
+      document.getElementById('notifCloseBtn')?.addEventListener('click', function() {
+        document.getElementById('notifOverlay').classList.remove('show');
+      });
+      document.getElementById('notifMarkAllReadBtn')?.addEventListener('click', markAllNotifsRead);
 
       setSyncStatus('⏳ Connecting to cloud…');
       loadFromSupabase().finally(() => {
