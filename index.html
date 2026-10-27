@@ -5741,7 +5741,7 @@
               <label>Legal Recommendation</label>
               <textarea id="legalRecommendationInput" placeholder="Your recommendation to Admin — proceed, proceed with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.legalRecommendation || '')}</textarea>
             </div>
-            ${editable ? `<button class="btn-secondary btn-sm" onclick="legalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button>` : ''}
+            ${editable ? `<button class="btn-secondary btn-sm" onclick="legalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button><button class="btn-secondary btn-sm" onclick="aiDraftLegal(${lead.id})" style="margin-bottom:8px;margin-left:6px;background:rgba(192,160,80,0.18);border-color:#c5b77a;">🤖 AI Draft</button>` : ''}
             ${lead.legalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#6a9ad4;">✅ ${lead.legalSubmittedBy || ''} — ${lead.legalSubmittedDate ? new Date(lead.legalSubmittedDate).toLocaleDateString() : ''}</div></div>` : ''}
             <div class="report-actions">
               ${currentRole === 'legal' && lead.legalStatus !== 'approved' && editable ? `<button class="btn-approve" onclick="legalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="legalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
@@ -5795,7 +5795,7 @@
               <label>Technical Recommendation</label>
               <textarea id="technicalRecommendationInput" placeholder="Your recommendation to Admin — proceed, proceed with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.technicalRecommendation || '')}</textarea>
             </div>
-            ${editable ? `<button class="btn-secondary btn-sm" onclick="technicalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button>` : ''}
+            ${editable ? `<button class="btn-secondary btn-sm" onclick="technicalSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Notes</button><button class="btn-secondary btn-sm" onclick="aiDraftTechnical(${lead.id})" style="margin-bottom:8px;margin-left:6px;background:rgba(192,160,80,0.18);border-color:#c5b77a;">🤖 AI Draft</button>` : ''}
             ${lead.technicalSubmitted ? `<div class="report-section"><div class="report-label">Submitted</div><div class="report-value" style="color:#d4a86a;">✅ ${lead.technicalSubmittedBy || ''} — ${lead.technicalSubmittedDate ? new Date(lead.technicalSubmittedDate).toLocaleDateString() : ''}</div></div>` : ''}
             <div class="report-actions">
               ${currentRole === 'technical' && lead.technicalStatus !== 'approved' && editable ? `<button class="btn-approve" onclick="technicalQuickApprove(${lead.id})">✅ Approve</button><button class="btn-decline" onclick="technicalQuickDeny(${lead.id})">❌ Deny</button>` : ''}
@@ -5874,7 +5874,7 @@
               <label>Credit Recommendation</label>
               <textarea id="creditRecommendationInput" placeholder="Your recommendation to Admin — sanction, sanction with conditions, or reject, and why." ${editable ? '' : 'disabled'}>${escapeHtml(lead.creditRecommendation || '')}</textarea>
             </div>
-            ${editable ? `<button class="btn-secondary btn-sm" onclick="creditSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Draft</button>` : ''}
+            ${editable ? `<button class="btn-secondary btn-sm" onclick="creditSaveNotes(${lead.id})" style="margin-bottom:8px;">💾 Save Draft</button><button class="btn-secondary btn-sm" onclick="aiDraftCredit(${lead.id})" style="margin-bottom:8px;margin-left:6px;background:rgba(192,160,80,0.18);border-color:#c5b77a;">🤖 AI Draft</button>` : ''}
             ${lead.creditSubmitted ? `<div class="report-section"><div class="report-label">Submitted by Credit</div><div class="report-value" style="color:#c9a84c;">✅ ${lead.creditSubmittedBy || ''} — ${lead.creditSubmittedDate ? new Date(lead.creditSubmittedDate).toLocaleDateString() : ''}</div></div>` : ''}
             ${lead.approvedBy ? `<div class="report-section"><div class="report-label">Approved by Admin</div><div class="report-value" style="color:#7ec98f;">✅ ${lead.approvedBy} — ${lead.approvedAt ? new Date(lead.approvedAt).toLocaleDateString() : ''}</div></div>` : ''}
             <div class="report-actions">
@@ -7383,6 +7383,82 @@
         window.__legalTeam = legalTeam;
         window.__technicalTeam = technicalTeam;
       });
+
+
+    // ============================================================
+    // AI Draft buttons for Legal / Technical / Credit assessments
+    // ============================================================
+    async function aiDraftGenerate(leadId, btn) {
+      var sess = await sb.auth.getSession();
+      if (!sess.data.session) { alert('Not signed in'); return null; }
+      var orig = btn.innerHTML;
+      btn.innerHTML = 'Generating...';
+      btn.disabled = true;
+      try {
+        var res = await fetch(
+          'https://nbpvamrwzqrgoiwpadwc.supabase.co/functions/v1/ai-credit-assistant',
+          { method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.data.session.access_token },
+            body: JSON.stringify({ lead_id: leadId, save: false }) }
+        );
+        var json = await res.json();
+        if (!res.ok || !json.ok) { alert('AI Draft failed: ' + (json.error || res.status)); return null; }
+        return json.assessment;
+      } catch(e) { alert('AI Draft error: ' + e.message); return null; }
+      finally { btn.innerHTML = orig; btn.disabled = false; }
+    }
+
+    function showAiBanner(nearId) {
+      var old = document.getElementById('ai-draft-banner');
+      if (old) old.remove();
+      var b = document.createElement('div');
+      b.id = 'ai-draft-banner';
+      b.style.cssText = 'background:rgba(192,160,80,0.14);border:1px solid #c5b77a;border-radius:6px;padding:8px 12px;font-size:11px;color:#c5b77a;margin-bottom:10px;';
+      b.innerHTML = '<b>AI DRAFT &mdash; Review and edit before saving.</b> Preliminary AI suggestion from available lead data. Your professional judgment is final.';
+      var el = document.getElementById(nearId);
+      if (el) el.insertAdjacentElement('beforebegin', b);
+    }
+
+    window.aiDraftLegal = async function(leadId) {
+      var a = await aiDraftGenerate(leadId, event.currentTarget || event.target);
+      if (!a) return;
+      var obs = document.getElementById('legalObservationInput');
+      var rec = document.getElementById('legalRecommendationInput');
+      if (obs) obs.value = [a.applicant_summary, a.risk_observations, a.missing_information ? 'Missing / Pending:\n' + a.missing_information : ''].filter(Boolean).join('\n\n').trim();
+      if (rec) {
+        var base = (a.draft_recommendation || '').replace('PROCEED WITH VERIFICATION','Proceed - subject to document verification').replace('REQUEST MORE INFORMATION','Proceed with conditions - additional documents required').replace('ESCALATE FOR REVIEW','Refer to Admin - legal concerns identified');
+        rec.value = base + (a.questions_for_applicant ? '\n\nOutstanding questions:\n' + a.questions_for_applicant : '');
+      }
+      showAiBanner('legalObservationInput');
+      typeof addFeed !== 'undefined' && addFeed('AI draft pre-filled for Legal report (Lead #' + leadId + ')');
+    };
+
+    window.aiDraftTechnical = async function(leadId) {
+      var a = await aiDraftGenerate(leadId, event.currentTarget || event.target);
+      if (!a) return;
+      var obs = document.getElementById('technicalObservationInput');
+      var rec = document.getElementById('technicalRecommendationInput');
+      if (obs) obs.value = [a.applicant_summary, 'Document findings:\n' + (a.missing_information || 'No document gaps identified by AI.'), a.risk_observations].filter(Boolean).join('\n\n').trim();
+      if (rec) {
+        var base = (a.draft_recommendation || '').replace('PROCEED WITH VERIFICATION','Proceed - site valuation and plan verification recommended').replace('REQUEST MORE INFORMATION','Proceed with conditions - additional property documents required').replace('ESCALATE FOR REVIEW','Refer to Admin - technical concerns identified');
+        rec.value = base + (a.questions_for_applicant ? '\n\nItems to verify on site visit:\n' + a.questions_for_applicant : '');
+      }
+      showAiBanner('technicalObservationInput');
+      typeof addFeed !== 'undefined' && addFeed('AI draft pre-filled for Technical report (Lead #' + leadId + ')');
+    };
+
+    window.aiDraftCredit = async function(leadId) {
+      var a = await aiDraftGenerate(leadId, event.currentTarget || event.target);
+      if (!a) return;
+      var obs = document.getElementById('creditObservationInput');
+      var rec = document.getElementById('creditRecommendationInput');
+      var cond = document.getElementById('creditConditionsInput');
+      if (obs) obs.value = [a.credit_observations, a.risk_observations].filter(Boolean).join('\n\n').trim();
+      if (rec) rec.value = a.draft_recommendation || '';
+      if (cond) cond.value = a.missing_information ? 'Pre-disbursement conditions:\n' + a.missing_information : '';
+      showAiBanner('creditObservationInput');
+      typeof addFeed !== 'undefined' && addFeed('AI draft pre-filled for Credit report (Lead #' + leadId + ')');
+    };
 
     })();
   </script>
