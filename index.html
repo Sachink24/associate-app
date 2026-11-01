@@ -2134,6 +2134,145 @@
       border-top: 1px solid rgba(255,215,0,0.05);
       margin-top: 8px;
     }
+
+    /* =====================================================================
+       LOOK & FEEL POLISH (style only) — Diamond Noir
+       ===================================================================== */
+
+    /* 1. Bottom navigation */
+    .bottom-nav {
+      background: linear-gradient(180deg, #14141f 0%, #0d0d16 100%);
+      border-top: 1px solid rgba(201, 168, 76, 0.18);
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .nav-item { position: relative; padding: 7px 18px; }
+    .nav-item i { font-size: 22px; }
+    .nav-item.active {
+      background: linear-gradient(180deg, rgba(201, 168, 76, 0.2), rgba(201, 168, 76, 0.05));
+      box-shadow: 0 0 18px rgba(201, 168, 76, 0.22), inset 0 0 0 1px rgba(201, 168, 76, 0.25);
+    }
+    .nav-item.active i { filter: drop-shadow(0 0 6px rgba(201, 168, 76, 0.65)); }
+    .nav-item.active::after {
+      content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+      width: 18px; height: 3px; border-radius: 3px; background: #c9a84c; box-shadow: 0 0 8px #c9a84c;
+    }
+
+    /* 2. Report stat cards: 3-column grid, icon + gold gradient number */
+    .stat-card {
+      flex: 1 1 calc(33.333% - 8px); min-width: 0; box-sizing: border-box;
+      background: linear-gradient(160deg, #181826 0%, #11111b 100%);
+      border: 1px solid rgba(201, 168, 76, 0.14); border-radius: 14px;
+      padding: 12px 6px 10px; text-align: center;
+      box-shadow: inset 0 1px 0 rgba(255, 215, 0, 0.05);
+    }
+    .stat-card i { color: #c9a84c; font-size: 13px; opacity: 0.85; margin-bottom: 6px; display: block; }
+    .stat-value {
+      font-size: 17px; font-weight: 700; line-height: 1.1;
+      background: linear-gradient(180deg, #f6e3a1 0%, #c9a84c 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: #f0d78a;
+    }
+    .stat-label {
+      font-size: 9.5px; color: #8a7f66; margin-top: 4px;
+      letter-spacing: 0.6px; text-transform: uppercase;
+    }
+
+    /* 3. Cards */
+    .card {
+      background: linear-gradient(160deg, #202030 0%, #181825 100%);
+      border: 1px solid rgba(201, 168, 76, 0.14);
+      border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.05);
+    }
+    .card:hover { border-color: rgba(201, 168, 76, 0.28); }
+    .card-title {
+      padding-bottom: 10px; margin-bottom: 14px;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.12);
+    }
+    .card-title i {
+      width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 50%; background: rgba(201, 168, 76, 0.12); font-size: 13px;
+    }
+
+    /* 4. Pipeline lead cards with stage accent bar */
+    .pipeline-item {
+      position: relative; padding: 12px 12px 12px 18px; margin-bottom: 10px;
+      border: 1px solid rgba(201, 168, 76, 0.1); border-radius: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      transition: 0.2s;
+    }
+    .pipeline-item:last-child { border-bottom: 1px solid rgba(201, 168, 76, 0.1); }
+    .pipeline-item:hover { background: rgba(201, 168, 76, 0.05); border-color: rgba(201, 168, 76, 0.25); }
+    .pipeline-item::before {
+      content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px;
+      border-radius: 0 4px 4px 0; background: #c9a84c; box-shadow: 0 0 10px rgba(201, 168, 76, 0.45);
+    }
+    .pipeline-item:has(.badge-new)::before { background: #b8aa8a; box-shadow: 0 0 10px rgba(184, 170, 138, 0.4); }
+    .pipeline-item:has(.badge-contacted)::before { background: #8ab4d6; box-shadow: 0 0 10px rgba(138, 180, 214, 0.45); }
+    .pipeline-item:has(.badge-docs)::before,
+    .pipeline-item:has(.badge-pending)::before { background: #d4b86a; box-shadow: 0 0 10px rgba(212, 184, 106, 0.45); }
+    .pipeline-item:has(.badge-underwriting)::before { background: #c48ad6; box-shadow: 0 0 10px rgba(196, 138, 214, 0.45); }
+    .pipeline-item:has(.badge-legal)::before,
+    .pipeline-item:has(.badge-bank)::before { background: #6a9ad4; box-shadow: 0 0 10px rgba(106, 154, 212, 0.45); }
+    .pipeline-item:has(.badge-technical)::before,
+    .pipeline-item:has(.badge-nbfc)::before { background: #d4a86a; box-shadow: 0 0 10px rgba(212, 168, 106, 0.45); }
+    .pipeline-item:has(.badge-approved)::before { background: #4fb286; box-shadow: 0 0 10px rgba(79, 178, 134, 0.55); }
+    .pipeline-item:has(.badge-declined)::before { background: #d46a6a; box-shadow: 0 0 10px rgba(212, 106, 106, 0.55); }
+    .badge { white-space: nowrap; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); }
+
+    /* 5. Buttons */
+    .btn-primary {
+      position: relative; overflow: hidden;
+      background: linear-gradient(135deg, #e6c566 0%, #c9a84c 45%, #a8832f 100%);
+      box-shadow: 0 6px 22px rgba(201, 168, 76, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .btn-primary::after {
+      content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+      transform: skewX(-20deg); pointer-events: none;
+      animation: btnShine 5s ease-in-out infinite;
+    }
+    @keyframes btnShine { 0%, 70% { left: -60%; } 100% { left: 130%; } }
+    .btn-primary:active { transform: scale(0.96); background: linear-gradient(135deg, #d9b85a, #b8923a); }
+    .btn-secondary:active, .btn-success:active, .stage-btn:active { transform: scale(0.96); }
+    .btn-secondary:hover { border-color: rgba(201, 168, 76, 0.4); box-shadow: 0 0 14px rgba(201, 168, 76, 0.12); }
+
+    /* 6. Header glow line */
+    .app-header {
+      position: relative; border-bottom: none;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(201, 168, 76, 0.16), transparent 62%),
+        linear-gradient(180deg, #1a1a2a 0%, #14141e 100%);
+    }
+    .app-header::after {
+      content: ''; position: absolute; left: 8%; right: 8%; bottom: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+      box-shadow: 0 0 10px rgba(201, 168, 76, 0.6);
+    }
+
+    /* 7. Screen switching */
+    .screen { animation: screenIn 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    @keyframes screenIn {
+      0% { opacity: 0; transform: translateY(16px) scale(0.99); }
+      100% { opacity: 1; transform: none; }
+    }
+
+    /* 8. Form fields */
+    .form-group { margin-bottom: 16px; }
+    .form-group label { transition: color 0.2s; }
+    .form-group:focus-within label { color: #c9a84c; }
+    .form-group input:hover, .form-group select:hover, .form-group textarea:hover { border-color: #3a3a52; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.2), 0 0 18px rgba(201, 168, 76, 0.12);
+    }
+
+    /* 9. Donut draw-in */
+    .donut-slice { animation: donutDraw 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    @keyframes donutDraw { from { stroke-dasharray: 0 100; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .screen, .donut-slice, .btn-primary::after { animation: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -4102,7 +4241,15 @@
         </div>`;
       }
 
-      const DONUT_COLORS = ['#c9a84c', '#6aa8d4', '#6ad49a', '#d46a6a', '#c48ad6', '#f0d78a', '#e0a458', '#5c7a9e', '#a89b7a', '#8a6d2b'];
+      // Diamond Noir palette: gold first, then jewel tones. Approved = green, Declined = red.
+      const DONUT_COLORS = ['#c9a84c', '#5b8fd6', '#9b7bd1', '#4fb3bf', '#d98c5f', '#f0d78a', '#b8b8c8', '#8a6d2b', '#c77aa6', '#7fa35a'];
+      function donutColor(label, i) {
+        const l = String(label || '').toLowerCase();
+        if (l.includes('declin')) return '#d46a6a';
+        if (l === 'approved') return '#4fb286';
+        let k = i, tries = 0;
+        return DONUT_COLORS[k % DONUT_COLORS.length];
+      }
       // Donut chart with centre total + legend. entries = [[label, count, extra?], ...]
       function donutRow(entries, emptyMsg) {
         const data = entries.filter(e => e[1] > 0);
@@ -4112,14 +4259,14 @@
         const gap = data.length > 1 ? 0.8 : 0;
         const slices = data.map((e, i) => {
           const pct = (e[1] / total) * 100;
-          const seg = `<circle cx="21" cy="21" r="15.915" fill="none" stroke="${DONUT_COLORS[i % DONUT_COLORS.length]}" stroke-width="6" stroke-dasharray="${Math.max(0, pct - gap).toFixed(2)} ${(100 - Math.max(0, pct - gap)).toFixed(2)}" stroke-dashoffset="${(25 - cum).toFixed(2)}"></circle>`;
+          const seg = `<circle class="donut-slice" style="animation-delay:${(i * 0.08).toFixed(2)}s" cx="21" cy="21" r="15.915" fill="none" stroke="${donutColor(e[0], i)}" stroke-width="6" stroke-dasharray="${Math.max(0, pct - gap).toFixed(2)} ${(100 - Math.max(0, pct - gap)).toFixed(2)}" stroke-dashoffset="${(25 - cum).toFixed(2)}"></circle>`;
           cum += pct;
           return seg;
         }).join('');
         const legend = data.map((e, i) => {
           const pct = Math.round((e[1] / total) * 100);
           return `<div style="display:flex; align-items:center; gap:8px; font-size:11px; color:#c9b98a; padding:3px 0;">
-            <span style="width:10px; height:10px; border-radius:3px; flex-shrink:0; background:${DONUT_COLORS[i % DONUT_COLORS.length]};"></span>
+            <span style="width:10px; height:10px; border-radius:3px; flex-shrink:0; background:${donutColor(e[0], i)};"></span>
             <span style="flex:1; min-width:0;">${escapeHtml(e[0])}${e[2] ? `<span style="display:block; font-size:10px; color:#8a7f66;">${escapeHtml(e[2])}</span>` : ''}</span>
             <span style="font-weight:600; color:#f0e6d0;">${e[1]}</span>
             <span style="color:#8a7f66; width:34px; text-align:right;">${pct}%</span>
@@ -4141,9 +4288,12 @@
       }
 
       function statCard(label, value) {
-        return `<div style="flex:1; min-width:100px; background:#12121c; border:1px solid rgba(255,215,0,0.08); border-radius:10px; padding:10px; text-align:center;">
-          <div style="font-size:18px; font-weight:700; color:#f0e6d0;">${value}</div>
-          <div style="font-size:10px; color:#8a7f66; margin-top:2px; letter-spacing:0.3px;">${escapeHtml(label)}</div>
+        const icons = { 'Total Leads': 'fa-users', 'SANCTIONED': 'fa-gem', 'Declined': 'fa-ban', 'In Progress': 'fa-hourglass-half',
+          'Conversion': 'fa-percent', 'Avg Ticket': 'fa-ticket-alt', 'Sanctioned Leads': 'fa-gem',
+          'Total Sanctioned': 'fa-rupee-sign', 'Avg Sanctioned': 'fa-chart-line' };
+        return `<div class="stat-card"><i class="fas ${icons[label] || 'fa-circle'}"></i>
+          <div class="stat-value">${value}</div>
+          <div class="stat-label">${escapeHtml(label)}</div>
         </div>`;
       }
 
@@ -5640,9 +5790,15 @@
 
         pipelineList.innerHTML = filteredLeads.map(lead => {
           const stage = lead.stage || 'New';
-          const badgeClass = stage === 'New' ? 'badge-new' : stage === 'Contacted' ? 'badge-contacted' : stage ===
-            'Document Collection' ? 'badge-docs' : stage === 'Underwriting' ? 'badge-underwriting' : stage ===
-            'Approved' ? 'badge-approved' : 'badge-declined';
+          const badgeClass = stage.includes('Declined') ? 'badge-declined'
+            : stage === 'New' ? 'badge-new'
+            : stage === 'Contacted' ? 'badge-contacted'
+            : stage === 'Document Collection' ? 'badge-docs'
+            : stage === 'Underwriting' ? 'badge-underwriting'
+            : stage === 'Approved' ? 'badge-approved'
+            : stage.startsWith('Legal') ? 'badge-legal'
+            : stage.startsWith('Technical') ? 'badge-technical'
+            : 'badge-pending';
           const isBT = lead.loanType === 'Balance Transfer + Top Up';
           const isLegalSubmitted = lead.legalSubmitted || false;
           const isTechnicalSubmitted = lead.technicalSubmitted || false;
