@@ -514,6 +514,49 @@
       color: #c9a84c;
     }
 
+    /* ===== HEADER DROPDOWN MENU ===== */
+    .header-actions { position: relative; }
+    .menu-btn {
+      position: relative; width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.25);
+      color: #c9a84c; font-size: 16px; cursor: pointer; transition: 0.2s;
+    }
+    .menu-btn:hover { background: rgba(201,168,76,0.2); }
+    .menu-dot {
+      display: none; position: absolute; top: 4px; right: 4px; width: 9px; height: 9px;
+      border-radius: 50%; background: #d46a6a; border: 2px solid #1a1a2a;
+    }
+    .header-menu {
+      display: none; position: absolute; top: 44px; right: 0; min-width: 210px; z-index: 1000;
+      background: #1c1c2a; border: 1px solid rgba(201,168,76,0.25); border-radius: 14px;
+      padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    }
+    .header-menu.open { display: block; animation: fadeUp 0.18s ease; }
+    .hm-item {
+      display: flex; align-items: center; gap: 12px; padding: 11px 12px;
+      border-radius: 10px; color: #e8dcc0; font-size: 13px; cursor: pointer; transition: 0.15s;
+    }
+    .hm-item:hover { background: rgba(201,168,76,0.12); }
+    .hm-item i { width: 20px; text-align: center; font-size: 15px; }
+    .hm-item.hm-danger { color: #d46a6a; border-top: 1px solid rgba(255,215,0,0.08); margin-top: 4px; border-radius: 0 0 10px 10px; }
+
+    /* ===== CENTERED HEADER BRAND ===== */
+    .app-header {
+      display: grid;
+      grid-template-columns: 36px 1fr 36px;
+      align-items: center;
+      column-gap: 8px;
+    }
+    .app-header::before { content: ''; grid-column: 1; }
+    .app-header .header-brand { grid-column: 2; text-align: center; }
+    .app-header .header-actions { grid-column: 3; justify-content: flex-end; }
+    .app-header h1 { display: flex; align-items: center; justify-content: center; }
+    .app-header .subtitle { text-align: center; }
+    .app-header .subtitle .user-info {
+      display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+      gap: 6px; margin-left: 0 !important; margin-top: 5px;
+    }
+
     .screen-container {
       flex: 1;
       overflow-y: auto;
@@ -2213,15 +2256,22 @@
         </div>
       </div>
       <div class="header-actions">
-        <i class="fab fa-whatsapp" id="waHubIcon" title="WhatsApp Communication" style="color:#25D366; cursor:pointer;"></i>
-        <span style="position:relative; display:inline-block;">
-          <i class="fas fa-bell" id="notifBellIcon" title="Notifications" style="color:#c9a84c; cursor:pointer;"></i>
-          <span id="notifBadge" style="display:none; position:absolute; top:-7px; right:-9px; background:#d46a6a; color:#fff; font-size:10px; font-weight:700; min-width:16px; height:16px; border-radius:8px; padding:0 4px; align-items:center; justify-content:center; line-height:16px; text-align:center;">0</span>
-        </span>
-        <i class="fas fa-search"></i>
-        <i class="fas fa-key" id="changePasswordIcon" title="Change Password" style="color:#c9a84c; cursor:pointer;"></i>
-        <i class="fas fa-sliders-h"></i>
-        <i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i>
+        <button class="menu-btn" id="headerMenuBtn" aria-label="Menu" aria-expanded="false">
+          <i class="fas fa-bars"></i><span class="menu-dot" id="menuDot"></span>
+        </button>
+        <div class="header-menu" id="headerMenu">
+          <div class="hm-item"><i class="fab fa-whatsapp" id="waHubIcon" title="WhatsApp Communication" style="color:#25D366; cursor:pointer;"></i><span>WhatsApp</span></div>
+          <div class="hm-item">
+            <span style="position:relative; display:inline-block;">
+              <i class="fas fa-bell" id="notifBellIcon" title="Notifications" style="color:#c9a84c; cursor:pointer;"></i>
+              <span id="notifBadge" style="display:none; position:absolute; top:-7px; right:-9px; background:#d46a6a; color:#fff; font-size:10px; font-weight:700; min-width:16px; height:16px; border-radius:8px; padding:0 4px; align-items:center; justify-content:center; line-height:16px; text-align:center;">0</span>
+            </span><span>Notifications</span>
+          </div>
+          <div class="hm-item"><i class="fas fa-search"></i><span>Search</span></div>
+          <div class="hm-item"><i class="fas fa-key" id="changePasswordIcon" title="Change Password" style="color:#c9a84c; cursor:pointer;"></i><span>Change Password</span></div>
+          <div class="hm-item"><i class="fas fa-sliders-h"></i><span>Settings</span></div>
+          <div class="hm-item hm-danger"><i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i><span>Logout</span></div>
+        </div>
       </div>
     </div>
 
@@ -7461,6 +7511,41 @@
     };
 
     })();
+  </script>
+
+  <!-- Header dropdown menu (style only; original icon ids/handlers untouched) -->
+  <script>
+  (function () {
+    const btn = document.getElementById('headerMenuBtn');
+    const menu = document.getElementById('headerMenu');
+    const dot = document.getElementById('menuDot');
+    const badge = document.getElementById('notifBadge');
+    if (!btn || !menu) return;
+    const close = () => { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = menu.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open);
+    });
+    document.addEventListener('click', e => { if (!menu.contains(e.target) && e.target !== btn) close(); });
+
+    // Tapping anywhere on a row triggers the original icon, so existing handlers still fire
+    menu.querySelectorAll('.hm-item').forEach(row => {
+      row.addEventListener('click', e => {
+        if (!e.target.closest('i')) row.querySelector('i').click();
+        close();
+      });
+    });
+
+    // Red dot on the menu button when the bell badge shows unread notifications
+    const sync = () => {
+      const unread = badge && badge.style.display !== 'none' && badge.textContent.trim() !== '0';
+      dot.style.display = unread ? 'block' : 'none';
+    };
+    if (badge) new MutationObserver(sync).observe(badge, { attributes: true, childList: true, characterData: true, subtree: true });
+    sync();
+  })();
   </script>
 
   <!-- WhatsApp Communication & Template Management System (additive module) -->
