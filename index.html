@@ -2273,6 +2273,35 @@
     @media (prefers-reduced-motion: reduce) {
       .screen, .donut-slice, .btn-primary::after { animation: none !important; }
     }
+
+    /* ===== HEADER PROFILE PICTURE ===== */
+    .app-header::before { display: none; }
+    .avatar-wrap { grid-column: 1; position: relative; width: 36px; height: 36px; }
+    .header-avatar {
+      position: relative; width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+      border: 2px solid #c9a84c; background: linear-gradient(145deg, #2a2438, #1a1a2a);
+      box-shadow: 0 0 14px rgba(201, 168, 76, 0.3);
+      display: flex; align-items: center; justify-content: center;
+      color: #c9a84c; font-weight: 700; font-size: 15px; transition: 0.2s;
+    }
+    .header-avatar:hover { box-shadow: 0 0 18px rgba(201, 168, 76, 0.55); }
+    .header-avatar img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      border-radius: 50%; object-fit: cover; display: none;
+    }
+    .header-avatar.has-photo img { display: block; }
+    .header-avatar.has-photo .avatar-initial { display: none; }
+    .avatar-cam {
+      position: absolute; right: -5px; bottom: -5px; width: 16px; height: 16px; border-radius: 50%;
+      background: #c9a84c; color: #0f0f18; font-size: 8px; border: 1.5px solid #14141e;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .avatar-menu {
+      display: none; position: absolute; top: 46px; left: 0; min-width: 190px; z-index: 1000;
+      background: #1c1c2a; border: 1px solid rgba(201, 168, 76, 0.25); border-radius: 14px;
+      padding: 6px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
+    .avatar-menu.open { display: block; animation: fadeUp 0.18s ease; }
   </style>
 </head>
 <body>
@@ -2404,6 +2433,18 @@
 
     <!-- APP HEADER -->
     <div class="app-header">
+      <div class="avatar-wrap">
+        <div class="header-avatar" id="headerAvatar" role="button" tabindex="0" aria-label="Profile picture" title="Profile picture">
+          <img id="headerAvatarImg" alt="Profile picture">
+          <span class="avatar-initial" id="headerAvatarInitial">?</span>
+          <span class="avatar-cam"><i class="fas fa-camera"></i></span>
+        </div>
+        <div class="avatar-menu" id="avatarMenu">
+          <div class="hm-item" id="avatarChange"><i class="fas fa-camera"></i><span>Change photo</span></div>
+          <div class="hm-item hm-danger" id="avatarRemove"><i class="fas fa-trash-alt"></i><span>Remove photo</span></div>
+        </div>
+        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+      </div>
       <div class="header-brand">
         <h1><i class="fas fa-gem"></i> SOLITAIRE</h1>
         <div class="subtitle">
@@ -4940,6 +4981,7 @@
           hideSimulatorTab(true);
           hideReportsTab(true);
           window.__homeAppliedFor = null;
+          if (window.__onUserChange) window.__onUserChange(null);
           document.getElementById('teamAssignmentSection').style.display = 'none';
           return;
         }
@@ -5088,6 +5130,7 @@
           if (repTab && !repTab.classList.contains('hidden-tab')) repTab.click();
           else if (capTab) capTab.click();
         }
+        if (window.__onUserChange) window.__onUserChange(currentUser);
       }
 
       // ================================================================
@@ -7770,6 +7813,77 @@
     };
     if (badge) new MutationObserver(sync).observe(badge, { attributes: true, childList: true, characterData: true, subtree: true });
     sync();
+  })();
+  </script>
+
+  <!-- Header profile picture (stored per user on this device; resized to 256px) -->
+  <script>
+  (function () {
+    const wrap = document.getElementById('headerAvatar');
+    const img = document.getElementById('headerAvatarImg');
+    const initial = document.getElementById('headerAvatarInitial');
+    const menu = document.getElementById('avatarMenu');
+    const fileInput = document.getElementById('avatarFileInput');
+    const removeRow = document.getElementById('avatarRemove');
+    if (!wrap || !fileInput) return;
+    const KEY = email => 'solitaire_avatar_' + String(email).toLowerCase();
+    let user = null;
+
+    function getPhoto() { try { return user ? localStorage.getItem(KEY(user)) : null; } catch (e) { return null; } }
+    function paint() {
+      const photo = getPhoto();
+      if (photo) { img.src = photo; wrap.classList.add('has-photo'); }
+      else { img.removeAttribute('src'); wrap.classList.remove('has-photo'); }
+      const name = (document.getElementById('userNameDisplay') || {}).textContent || '';
+      initial.textContent = (name.trim().charAt(0) || '?').toUpperCase();
+      removeRow.style.display = photo ? 'flex' : 'none';
+    }
+    const closeMenu = () => menu.classList.remove('open');
+
+    window.__onUserChange = function (email) { user = email || null; closeMenu(); paint(); };
+
+    wrap.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!user) return;
+      menu.classList.toggle('open');
+    });
+    wrap.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); wrap.click(); } });
+    document.addEventListener('click', e => { if (!menu.contains(e.target) && e.target !== wrap) closeMenu(); });
+
+    document.getElementById('avatarChange').addEventListener('click', () => { closeMenu(); fileInput.click(); });
+    removeRow.addEventListener('click', () => {
+      try { if (user) localStorage.removeItem(KEY(user)); } catch (e) {}
+      closeMenu(); paint();
+    });
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (!file || !user) return;
+      if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return; }
+      const url = URL.createObjectURL(file);
+      const im = new Image();
+      im.onload = () => {
+        // centre-crop to a square and shrink to 256px so it stays small
+        const size = 256, side = Math.min(im.naturalWidth, im.naturalHeight);
+        const sx = (im.naturalWidth - side) / 2, sy = (im.naturalHeight - side) / 2;
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        c.getContext('2d').drawImage(im, sx, sy, side, side, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+        try {
+          localStorage.setItem(KEY(user), c.toDataURL('image/jpeg', 0.85));
+          paint();
+        } catch (e) { alert('Could not save the photo on this device (storage full).'); }
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); alert('Could not read that image. Try another photo.'); };
+      im.src = url;
+    });
+
+    // Keep the initial in sync if the name text changes
+    const nameEl = document.getElementById('userNameDisplay');
+    if (nameEl) new MutationObserver(paint).observe(nameEl, { childList: true, characterData: true, subtree: true });
+    paint();
   })();
   </script>
 
