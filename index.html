@@ -2196,15 +2196,17 @@
 
     /* 4. Pipeline lead cards with stage accent bar */
     .pipeline-item {
-      position: relative; padding: 12px 12px 12px 18px; margin-bottom: 10px;
-      border: 1px solid rgba(201, 168, 76, 0.1); border-radius: 14px;
-      background: rgba(255, 255, 255, 0.02);
+      position: relative; padding: 16px 16px 16px 20px; margin-bottom: 14px;
+      /* same navy-blue card look as every other page */
+      background: linear-gradient(160deg, #202030 0%, #181825 100%);
+      border: 1px solid rgba(201, 168, 76, 0.14); border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.05);
       transition: 0.2s;
     }
-    .pipeline-item:last-child { border-bottom: 1px solid rgba(201, 168, 76, 0.1); }
-    .pipeline-item:hover { background: rgba(201, 168, 76, 0.05); border-color: rgba(201, 168, 76, 0.25); }
+    .pipeline-item:last-child { border-bottom: 1px solid rgba(201, 168, 76, 0.14); }
+    .pipeline-item:hover { border-color: rgba(201, 168, 76, 0.28); }
     .pipeline-item::before {
-      content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px;
+      content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 4px;
       border-radius: 0 4px 4px 0; background: #c9a84c; box-shadow: 0 0 10px rgba(201, 168, 76, 0.45);
     }
     .pipeline-item:has(.badge-new)::before { background: #b8aa8a; box-shadow: 0 0 10px rgba(184, 170, 138, 0.4); }
@@ -2302,6 +2304,17 @@
       padding: 6px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
     }
     .avatar-menu.open { display: block; animation: fadeUp 0.18s ease; }
+
+    /* ===== CURRENT LEAD ANALYSIS: customer details ===== */
+    .lead-section-title {
+      margin: 12px 0 6px; padding-top: 10px; border-top: 1px solid rgba(201, 168, 76, 0.12);
+      font-size: 10.5px; color: #c9a84c; letter-spacing: 1.5px; text-transform: uppercase;
+    }
+    .lead-section-title i { margin-right: 6px; }
+    .lead-detail-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 12px; }
+    .lead-detail-grid .k { color: #8a7f66; }
+    .lead-detail-grid .v { color: #f0e6d0; text-align: right; word-break: break-word; }
+    .lead-detail-grid .v a { color: #6a9ad4; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -3444,6 +3457,11 @@
           <div class="form-group"><label>Property value (₹) <span id="simPropVal" class="sim-value">3,50,00,000</span></label><input type="range" class="sim-slider" id="simProp" min="1000000" max="100000000" step="100000" value="35000000"></div>
           <div class="form-group"><label>Combined annual income (₹) <span id="simIncomeVal" class="sim-value">12,00,000</span></label><input type="range" class="sim-slider" id="simIncome" min="300000" max="5000000" step="50000" value="1200000"></div>
           <div class="form-group"><label>Combined monthly debt (₹) <span id="simDebtVal" class="sim-value">20,000</span></label><input type="range" class="sim-slider" id="simDebt" min="0" max="150000" step="1000" value="20000"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Interest rate (% p.a.)</label><input type="number" id="simRate" value="9" step="0.05" min="1" max="30"></div>
+            <div class="form-group"><label>Tenure (years)</label><input type="number" id="simTenure" value="20" step="0.5" min="1" max="40"></div>
+          </div>
+          <div id="simFoirNote" style="font-size:11px; color:#8a7f66; margin:-4px 0 10px 0;">Rate and tenure are used to estimate the proposed EMI for FOIR.</div>
           <div class="form-group"><label>Credit band</label><select id="simCredit"><option value="Excellent">Excellent (CIBIL 760+)</option><option value="Good" selected>Good (CIBIL 700-759)</option><option value="Fair">Fair (CIBIL 650-699)</option><option value="Poor">Poor (CIBIL <650)</option></select></div>
           <!-- CIBIL Score Display in Simulator -->
           <div class="cibil-display" style="margin-top:8px;">
@@ -3457,13 +3475,14 @@
             <div><span class="text-muted">Risk dial</span><div class="risk-dial" id="riskDial">72</div></div>
             <div><span class="text-muted">DTI</span><div style="font-size:24px; font-weight:600; color:#f0e6d0;" id="dtiDisplay">20.0%</div></div>
             <div><span class="text-muted">LTV</span><div style="font-size:24px; font-weight:600; color:#f0e6d0;" id="ltvDisplay">71.4%</div></div>
+            <div><span class="text-muted">FOIR</span><div style="font-size:24px; font-weight:600; color:#f0e6d0;" id="foirDisplay">—</div><div id="foirEmi" style="font-size:10px; color:#8a7f66;">EMI —</div></div>
           </div>
           <div id="decisionBadge" class="badge badge-approved" style="font-size:15px; padding:8px 16px; display:inline-block; margin:4px 0 8px 0;">✅ Approved</div>
           <div class="notes-box" id="underwritingNotes"><strong>📋 Underwriting notes</strong><br>DTI within limit, LTV acceptable, good credit.</div>
         </div>
         <div class="card" id="simLeadDisplay">
           <div class="card-title"><i class="fas fa-file-alt"></i> Current Lead Analysis</div>
-          <div id="simLeadInfo" style="color:#6a5f48; font-size:13px;">No lead selected. Save a lead to see analysis here.</div>
+          <div id="simLeadInfo" style="color:#6a5f48; font-size:13px;">No lead selected. Open a lead in Pipeline or save a new lead to see its analysis here.</div>
         </div>
       </div>
     </div>
@@ -6468,6 +6487,7 @@
       // ================================================================
       function showDetail(lead) {
         const detailView = document.getElementById('detailView');
+        updateSimulatorLead(lead);
         detailView.style.display = 'block';
         const isBT = lead.loanType === 'Balance Transfer + Top Up';
         const borrowerRetirement = lead.borrower.retirementInfo || { maxAge: 60, pensionFactor: 0, maxTerm: 30 };
@@ -7033,9 +7053,54 @@
       function updateSimulatorLead(lead) {
         const info = document.getElementById('simLeadInfo');
         if (!info) return;
+        populateSimulatorFromLead(lead);
         const isBT = lead.loanType === 'Balance Transfer + Top Up';
         const maxTerm = lead.borrower.retirementInfo?.maxTerm || 30;
         const cibilInfo = lead.borrower.cibilBand || '—';
+        const coList = Array.isArray(lead.coApplicants) ? lead.coApplicants : [];
+        const inr = n => '₹' + (Number(n) || 0).toLocaleString('en-IN');
+        const combinedIncome = (Number(lead.borrower.income) || 0) + coList.reduce((t, c) => t + (Number(c.income) || 0), 0);
+        const combinedDebt = (Number(lead.borrower.debt) || 0) + coList.reduce((t, c) => t + (Number(c.debt) || 0), 0);
+        const dRow = (k, v) => `<div class="k">${k}</div><div class="v">${v === undefined || v === null || v === '' ? '—' : v}</div>`;
+        const phoneVal = lead.borrower.phone ? `<a href="tel:${escapeHtml(lead.borrower.phone)}">${escapeHtml(lead.borrower.phone)}</a>` : '';
+        const emailVal = lead.borrower.email ? `<a href="mailto:${escapeHtml(lead.borrower.email)}">${escapeHtml(lead.borrower.email)}</a>` : '';
+        const place = [lead.borrower.location, lead.borrower.pincode].filter(Boolean).map(escapeHtml).join(' - ');
+        const kycRaw = String(lead.kycStatus || 'pending').toLowerCase();
+        const kycVal = kycRaw === 'approved' ? '<span style="color:#6ad49a;">✅ Approved</span>'
+          : kycRaw === 'rejected' ? '<span style="color:#d46a6a;">❌ Rejected</span>'
+          : '<span style="color:#e0c46a;">⏳ ' + escapeHtml(kycRaw.charAt(0).toUpperCase() + kycRaw.slice(1)) + '</span>';
+        const propAddress = [lead.property?.address, lead.property?.city, lead.property?.state, lead.property?.pincode]
+          .filter(Boolean).map(escapeHtml).join(', ');
+        const refList = Array.isArray(lead.references) ? lead.references.filter(r => r && (r.name || r.phone)) : [];
+        const refBlock = refList.length ? `
+          <div class="lead-section-title"><i class="fas fa-address-book"></i>References</div>
+          <div class="lead-detail-grid">
+            ${refList.map(r => dRow(escapeHtml(r.name || 'Reference') + (r.relationship ? ' <span style="opacity:.7;">(' + escapeHtml(r.relationship) + ')</span>' : ''),
+              r.phone ? `<a href="tel:${escapeHtml(r.phone)}">${escapeHtml(r.phone)}</a>` : '')).join('')}
+          </div>` : '';
+        const customerBlock = `
+          <div class="lead-section-title"><i class="fas fa-user"></i>Customer details</div>
+          <div class="lead-detail-grid">
+            ${dRow('Name', escapeHtml(lead.borrower.name))}
+            ${dRow('Father', escapeHtml(lead.borrower.father || ''))}
+            ${dRow('Mobile', phoneVal)}
+            ${dRow('Email', emailVal)}
+            ${dRow('Age', lead.borrower.age ? escapeHtml(lead.borrower.age) + ' yrs' : '')}
+            ${dRow('Employment', escapeHtml(lead.borrower.employment || ''))}
+            ${dRow('Company', escapeHtml(lead.borrower.company || ''))}
+            ${dRow('Location', place)}
+            ${dRow('KYC status', kycVal)}
+          </div>
+          <div class="lead-section-title"><i class="fas fa-wallet"></i>Financials</div>
+          <div class="lead-detail-grid">
+            ${dRow('Loan amount', inr(lead.loanAmount))}
+            ${dRow('Property', escapeHtml(lead.property?.type || ''))}
+            ${dRow('Property value', lead.property?.value ? inr(lead.property.value) : '')}
+            ${dRow('Property address', propAddress)}
+            ${dRow('Annual income' + (coList.length ? ' (combined)' : ''), combinedIncome ? inr(combinedIncome) : '')}
+            ${dRow('Monthly debt' + (coList.length ? ' (combined)' : ''), inr(combinedDebt))}
+            ${coList.length ? dRow('Co-applicants', coList.map(c => escapeHtml(c.name || 'Unnamed')).join(', ')) : ''}
+          </div>${refBlock}`;
         info.innerHTML = `
           <div style="color:#f0e6d0;"><strong>${escapeHtml(lead.borrower.name)}</strong> · ${escapeHtml(lead.loanType)}</div>
           <div style="font-size:13px; color:#b8aa8a;">₹${(lead.loanAmount/100000).toFixed(1)}L · ${escapeHtml(lead.credit)}</div>
@@ -7050,7 +7115,8 @@
             ${lead.legalSubmitted ? `<span style="background:#1a2a3a; padding:2px 10px; border-radius:12px; font-size:10px; color:#6a9ad4;">📤 Legal</span>` : ''}
             ${lead.technicalSubmitted ? `<span style="background:#3a2a1a; padding:2px 10px; border-radius:12px; font-size:10px; color:#d4a86a;">📤 Tech</span>` : ''}
           </div>
-          <button class="btn-secondary btn-sm" style="margin-top:6px; width:100%;" onclick="document.querySelector('.nav-item[data-screen=\\'pipeline\\']').click();">📊 View in Pipeline</button>
+          ${customerBlock}
+          <button class="btn-secondary btn-sm" style="margin-top:10px; width:100%;" onclick="document.querySelector('.nav-item[data-screen=\\'pipeline\\']').click();">📊 View in Pipeline</button>
         `;
         updateCibilDisplay(globalCibilScore);
       }
@@ -7072,6 +7138,26 @@
         document.getElementById('dtiDisplay').textContent = dti.toFixed(1) + '%';
         document.getElementById('ltvDisplay').textContent = ltv.toFixed(1) + '%';
 
+        // FOIR = (existing monthly obligations + proposed EMI) / monthly income
+        const simRate = parseFloat(document.getElementById('simRate')?.value) || 0;
+        const simYears = parseFloat(document.getElementById('simTenure')?.value) || 0;
+        const nMonths = Math.round(simYears * 12), mRate = simRate / 1200;
+        let proposedEmi = 0;
+        if (loan > 0 && nMonths > 0) {
+          proposedEmi = mRate > 0
+            ? loan * mRate * Math.pow(1 + mRate, nMonths) / (Math.pow(1 + mRate, nMonths) - 1)
+            : loan / nMonths;
+        }
+        const monthlyIncome = income / 12;
+        const foir = monthlyIncome > 0 ? ((debt + proposedEmi) / monthlyIncome) * 100 : 0;
+        const foirEl = document.getElementById('foirDisplay');
+        if (foirEl) {
+          foirEl.textContent = foir.toFixed(1) + '%';
+          foirEl.style.color = foir <= 40 ? '#6ad49a' : foir <= 50 ? '#e0c46a' : '#d46a6a';
+          const emiEl = document.getElementById('foirEmi');
+          if (emiEl) emiEl.textContent = 'EMI ₹' + Math.round(proposedEmi).toLocaleString('en-IN');
+        }
+
         let riskScore = 50;
         if (dti < 20) riskScore += 20;
         else if (dti < 30) riskScore += 10;
@@ -7092,6 +7178,16 @@
         else if (cibilInfo.band === 'Fair') riskScore -= 5;
         else riskScore -= 20;
 
+        // FOIR limits (edit here): up to FOIR_OK is fine, up to FOIR_MAX is conditional, above that is declined
+        const FOIR_OK = 50, FOIR_MAX = 60;
+        if (foir > FOIR_MAX) riskScore -= 20;
+        else if (foir > FOIR_OK) riskScore -= 10;
+        const foirNote = foir > FOIR_MAX
+          ? ' FOIR ' + foir.toFixed(1) + '% is above the ' + FOIR_MAX + '% limit.'
+          : foir > FOIR_OK
+            ? ' FOIR ' + foir.toFixed(1) + '% is above ' + FOIR_OK + '%, reduce the loan amount or lengthen the tenure.'
+            : '';
+
         riskScore = Math.max(0, Math.min(100, riskScore));
 
         const riskDial = document.getElementById('riskDial');
@@ -7101,23 +7197,66 @@
         const decisionBadge = document.getElementById('decisionBadge');
         const notes = document.getElementById('underwritingNotes');
 
-        if (riskScore >= 70 && dti < 30 && ltv < 80) {
+        if (riskScore >= 70 && dti < 30 && ltv < 80 && foir <= FOIR_OK) {
           decisionBadge.textContent = '✅ Approved';
           decisionBadge.className = 'badge badge-approved';
           notes.innerHTML =
             '<strong>📋 Underwriting notes</strong><br>Strong profile: Low DTI, acceptable LTV, good credit. Recommended for approval.';
-        } else if (riskScore >= 50 && dti < 40 && ltv < 85) {
+        } else if (riskScore >= 50 && dti < 40 && ltv < 85 && foir <= FOIR_MAX) {
           decisionBadge.textContent = '⚠️ Conditional';
           decisionBadge.className = 'badge badge-underwriting';
           notes.innerHTML =
-            '<strong>📋 Underwriting notes</strong><br>Conditional approval: DTI or LTV slightly high. Consider lower loan amount or additional collateral.';
+            '<strong>📋 Underwriting notes</strong><br>Conditional approval: DTI, LTV or FOIR slightly high. Consider lower loan amount or additional collateral.' + foirNote;
         } else {
           decisionBadge.textContent = '❌ Declined';
           decisionBadge.className = 'badge badge-declined';
           notes.innerHTML =
-            '<strong>📋 Underwriting notes</strong><br>Risk factors: High DTI or LTV, poor credit. Declined. Recommend improving credit profile.';
+            '<strong>📋 Underwriting notes</strong><br>Risk factors: High DTI, LTV or FOIR, or poor credit. Declined. Recommend improving credit profile.' + foirNote;
         }
         updateCibilDisplay(globalCibilScore);
+      }
+
+      // Fill the simulator from the selected lead (loan, property value, combined income & debt, credit band, rate, tenure)
+      function setSimSlider(id, value) {
+        const el = document.getElementById(id);
+        const v = Math.round(Number(value));
+        if (!el || !isFinite(v) || v < 0) return;
+        if (!el.dataset.origStep) { el.dataset.origMin = el.min; el.dataset.origMax = el.max; el.dataset.origStep = el.step; }
+        const steps = [Number(el.dataset.origStep), 10000, 1000, 100, 1];
+        const st = steps.find(x => x > 0 && v % x === 0) || 1;
+        let mn = Math.min(Number(el.dataset.origMin), v);
+        mn -= mn % st;
+        el.step = st;
+        el.min = mn;
+        el.max = Math.max(Number(el.dataset.origMax), v);
+        el.value = v;
+      }
+
+      function populateSimulatorFromLead(lead) {
+        if (!lead || !document.getElementById('simLoan')) return;
+        const co = Array.isArray(lead.coApplicants) ? lead.coApplicants : [];
+        const income = (Number(lead.borrower?.income) || 0) + co.reduce((sum, c) => sum + (Number(c.income) || 0), 0);
+        const debt = (Number(lead.borrower?.debt) || 0) + co.reduce((sum, c) => sum + (Number(c.debt) || 0), 0);
+        if (Number(lead.loanAmount) > 0) setSimSlider('simLoan', lead.loanAmount);
+        if (Number(lead.property?.value) > 0) setSimSlider('simProp', lead.property.value);
+        if (income > 0) setSimSlider('simIncome', income);
+        setSimSlider('simDebt', debt);
+
+        const sel = document.getElementById('simCredit');
+        if (sel && lead.credit && Array.from(sel.options).some(o => o.value === lead.credit)) sel.value = lead.credit;
+
+        // Rate / tenure: Credit team values if entered, otherwise an estimate
+        const roi = parseFloat(lead.creditROI) > 0 ? parseFloat(lead.creditROI) : null;
+        const months = parseInt(lead.creditTermMonths) > 0 ? parseInt(lead.creditTermMonths) : null;
+        const estYears = Math.min(Number(lead.borrower?.retirementInfo?.maxTerm) || 20, 20);
+        const rateEl = document.getElementById('simRate'), tenEl = document.getElementById('simTenure');
+        if (rateEl) rateEl.value = roi || 9;
+        if (tenEl) tenEl.value = months ? +(months / 12).toFixed(1) : estYears;
+        const note = document.getElementById('simFoirNote');
+        if (note) note.textContent = (roi && months)
+          ? 'Rate and tenure taken from the Credit team entry for this lead.'
+          : 'Estimated ' + (roi || 9) + '% for ' + (months ? +(months / 12).toFixed(1) : estYears) + ' years until the Credit team enters ROI and term. Adjust if needed.';
+        runSimulator();
       }
 
       function formatCurrency(val) {
@@ -7131,6 +7270,8 @@
       document.getElementById('simIncome').addEventListener('input', runSimulator);
       document.getElementById('simDebt').addEventListener('input', runSimulator);
       document.getElementById('simCredit').addEventListener('change', runSimulator);
+      document.getElementById('simRate')?.addEventListener('input', runSimulator);
+      document.getElementById('simTenure')?.addEventListener('input', runSimulator);
 
       // ================================================================
       // 22. EXPORT
