@@ -2315,6 +2315,30 @@
     .lead-detail-grid .k { color: #8a7f66; }
     .lead-detail-grid .v { color: #f0e6d0; text-align: right; word-break: break-word; }
     .lead-detail-grid .v a { color: #6a9ad4; text-decoration: none; }
+
+    /* ===== CO-APPLICANT CIBIL CHIP ===== */
+    .co-cibil-chip { margin-top: 6px; min-height: 22px; }
+    .co-cibil-chip span { display: inline-block; padding: 3px 11px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .co-chip-excellent { background: #0f2a1a; color: #6ad49a; border: 1px solid #1a4a2a; }
+    .co-chip-good { background: #1a2a3a; color: #8ab4d6; border: 1px solid #2a4a6a; }
+    .co-chip-fair { background: #2a2a1a; color: #d4b86a; border: 1px solid #4a4a1a; }
+    .co-chip-poor, .co-chip-invalid { background: #2a0f0f; color: #d46a6a; border: 1px solid #4a1a1a; }
+    .co-chip-none { background: rgba(255,255,255,0.04); color: #8a7f66; border: 1px solid rgba(255,255,255,0.08); }
+
+    /* ===== PROFILE TYPE / CHANNEL RULE ===== */
+    .profile-flags { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .flag-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer;
+      background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(201, 168, 76, 0.14);
+      border-radius: 12px; font-size: 13px; color: #e8dcc0; transition: 0.2s;
+    }
+    .flag-row:hover { border-color: rgba(201, 168, 76, 0.3); }
+    .flag-row input { width: 18px; height: 18px; accent-color: #c9a84c; flex-shrink: 0; }
+    .flag-row:has(input:checked) { background: rgba(201, 168, 76, 0.1); border-color: #c9a84c; }
+    .channel-note {
+      margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; font-size: 12px; line-height: 1.5;
+      background: rgba(212, 168, 106, 0.1); border: 1px solid rgba(212, 168, 106, 0.35); color: #e0c28a;
+    }
   </style>
 </head>
 <body>
@@ -2536,18 +2560,6 @@
             <span id="leadSubmittedBadge" class="submitted-badge" style="display:none;">✓ Submitted</span>
           </div>
 
-          <!-- CIBIL SCORE (Manual Entry) -->
-          <div class="card-title" style="margin-top:4px;"><i class="fas fa-chart-line"></i> CIBIL Score</div>
-          <div class="cibil-display" id="cibilDisplay">
-            <span class="score-badge" id="cibilScoreDisplay">—</span>
-            <span class="score-label">CIBIL Score</span>
-            <span class="score-band" id="cibilBandDisplay">Not Set</span>
-          </div>
-          <div class="form-group">
-            <label>Enter CIBIL Score (300–900)</label>
-            <input type="number" id="cibilScoreInput" placeholder="e.g. 750" min="300" max="900" value="750">
-          </div>
-          <button class="btn-secondary btn-sm" id="applyCibilBtn" style="width:100%;"><i class="fas fa-sync"></i> Apply & Auto-set Credit Band</button>
 
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-user"></i> Personal Details</div>
           <div class="form-group">
@@ -2627,6 +2639,18 @@
               <input type="number" id="borrowerDebt" value="15000" step="1000">
             </div>
           </div>
+          <!-- CIBIL SCORE (applicant) — same place as in co-applicant: below income / debt -->
+          <div class="form-group">
+            <label>CIBIL Score (300–900)</label>
+            <input type="number" id="cibilScoreInput" placeholder="e.g. 750" min="300" max="900" value="750">
+          </div>
+          <div class="cibil-display" id="cibilDisplay">
+            <span class="score-badge" id="cibilScoreDisplay">—</span>
+            <span class="score-label">CIBIL Score</span>
+            <span class="score-band" id="cibilBandDisplay">Not Set</span>
+          </div>
+          <button class="btn-secondary btn-sm" id="applyCibilBtn" style="width:100%; margin-bottom:12px;"><i class="fas fa-sync"></i> Apply & Auto-set Credit Band</button>
+
           <div class="form-group">
             <label>Retirement Age (if applicable)</label>
             <input type="number" id="borrowerRetirementAge" placeholder="e.g. 60" value="60" step="1">
@@ -2678,6 +2702,7 @@
                     <option value="Salaried - Private">Salaried - Private</option>
                     <option value="Self-Employed - Business" selected>Self-Employed - Business</option>
                     <option value="Self-Employed - Professional">Self-Employed - Professional</option>
+                    <option value="Housewife">Housewife</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -2704,6 +2729,11 @@
                   <label>Monthly debt (₹)</label>
                   <input type="number" class="co-debt" value="5000" step="1000">
                 </div>
+              </div>
+              <div class="form-group">
+                <label>CIBIL Score (300–900)</label>
+                <input type="number" class="co-cibil" placeholder="e.g. 720" min="300" max="900" value="720">
+                <div class="co-cibil-chip"></div>
               </div>
               <div class="form-group">
                 <label>Date of Birth</label>
@@ -3396,6 +3426,16 @@
             </div>
           </div>
 
+          <!-- PROFILE TYPE (drives channel mapping) -->
+          <div class="card-title" style="margin-top:8px;"><i class="fas fa-random"></i> Profile type</div>
+          <div class="profile-flags" id="profileFlags">
+            <label class="flag-row"><input type="checkbox" class="profile-flag" value="gram_panchayat"><span>Property on Gram Panchayat / Gauthan land</span></label>
+            <label class="flag-row"><input type="checkbox" class="profile-flag" value="cash_salary"><span>Person with cash salary</span></label>
+            <label class="flag-row"><input type="checkbox" class="profile-flag" value="no_itr"><span>Person without income tax file (no ITR)</span></label>
+            <label class="flag-row"><input type="checkbox" class="profile-flag" value="informal_cash_business"><span>Informal business with cash components</span></label>
+          </div>
+          <div class="channel-note" id="channelRuleNote" style="display:none;"></div>
+
           <!-- INSTITUTION SELECTION -->
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-university"></i> Select Institution</div>
           <div class="form-group">
@@ -3468,6 +3508,17 @@
             <span class="score-badge" id="simCibilScore">—</span>
             <span class="score-label">CIBIL Score</span>
             <span class="score-band" id="simCibilBand">Not Set</span>
+          </div>
+          <div id="simCibilBasisWrap" style="display:none; margin-top:10px;">
+            <div class="form-group">
+              <label>CIBIL basis (co-applicants)</label>
+              <select id="simCibilBasis">
+                <option value="primary">Primary applicant only</option>
+                <option value="lowest">Lowest of all applicants</option>
+                <option value="average">Average of all applicants</option>
+              </select>
+            </div>
+            <div id="simCoCibilList" style="font-size:11px; color:#8a7f66;"></div>
           </div>
         </div>
         <div class="card">
@@ -4171,22 +4222,38 @@
         return { band: 'Poor', cls: 'poor' };
       }
 
-      function updateCibilDisplay(score) {
+      const PROFILE_FLAG_LABELS = {
+        gram_panchayat: 'Gram Panchayat / Gauthan property',
+        cash_salary: 'Cash salary',
+        no_itr: 'No ITR filed',
+        informal_cash_business: 'Informal cash business'
+      };
+      function profileFlagText(lead) {
+        return ((lead.borrower && lead.borrower.profileFlags) || []).map(f => PROFILE_FLAG_LABELS[f] || f).join(', ');
+      }
+
+      // "Priya 720 (Good), Raj 690 (Fair)" for co-applicants that have a CIBIL score ('' if none)
+      function coCibilText(lead) {
+        return (lead.coApplicants || []).filter(c => c && c.cibilScore)
+          .map(c => (c.name || 'Co-applicant') + ' ' + c.cibilScore + ' (' + (c.cibilBand || getCibilBand(c.cibilScore).band) + ')').join(', ');
+      }
+
+      function updateCibilDisplay(score, simOnly) {
         const info = getCibilBand(score);
         const displayEl = document.getElementById('cibilScoreDisplay');
         const bandEl = document.getElementById('cibilBandDisplay');
         const simScoreEl = document.getElementById('simCibilScore');
         const simBandEl = document.getElementById('simCibilBand');
-        if (displayEl) { displayEl.textContent = score || '—';
+        if (displayEl && !simOnly) { displayEl.textContent = score || '—';
           displayEl.className = 'score-badge ' + (info ? info.cls : ''); }
-        if (bandEl) { bandEl.textContent = info ? info.band : 'Not Set';
+        if (bandEl && !simOnly) { bandEl.textContent = info ? info.band : 'Not Set';
           bandEl.className = 'score-band ' + (info ? info.cls : ''); }
         if (simScoreEl) { simScoreEl.textContent = score || '—';
           simScoreEl.className = 'score-badge ' + (info ? info.cls : ''); }
         if (simBandEl) { simBandEl.textContent = info ? info.band : 'Not Set';
           simBandEl.className = 'score-band ' + (info ? info.cls : ''); }
         const creditSelect = document.getElementById('leadCredit');
-        if (creditSelect && info) {
+        if (creditSelect && info && !simOnly) {
           const bandMap = { 'Excellent': 'Excellent', 'Good': 'Good', 'Fair': 'Fair', 'Poor': 'Poor' };
           creditSelect.value = bandMap[info.band] || 'Good';
         }
@@ -5235,6 +5302,33 @@
       }
       document.getElementById('institutionTypeSelect').addEventListener('change', updateInstitutionSelect);
 
+      // Profile rule: these profiles are mapped to the NBFC channel; the Bank channel is hidden
+      function getProfileFlags() {
+        return Array.from(document.querySelectorAll('.profile-flag:checked')).map(c => c.value);
+      }
+      function applyChannelRule() {
+        const flags = getProfileFlags();
+        const typeSel = document.getElementById('institutionTypeSelect');
+        const note = document.getElementById('channelRuleNote');
+        if (flags.length) {
+          if (typeSel.dataset.prev === undefined) typeSel.dataset.prev = typeSel.value;
+          typeSel.innerHTML = '<option value="NBFC">🏢 NBFC</option>';
+          typeSel.value = 'NBFC';
+          if (note) {
+            note.style.display = 'block';
+            note.textContent = '🏢 Mapped to NBFC channel. Bank channel is hidden for this profile (' +
+              flags.map(f => PROFILE_FLAG_LABELS[f]).join(', ') + ').';
+          }
+        } else {
+          typeSel.innerHTML = '<option value="BANK">🏦 BANK</option><option value="NBFC">🏢 NBFC</option>';
+          typeSel.value = typeSel.dataset.prev || 'BANK';
+          delete typeSel.dataset.prev;
+          if (note) note.style.display = 'none';
+        }
+        updateInstitutionSelect();
+      }
+      document.querySelectorAll('.profile-flag').forEach(cb => cb.addEventListener('change', applyChannelRule));
+
       // ================================================================
       // 9. TEAM MANAGEMENT (Admin)
       // ================================================================
@@ -5438,7 +5532,7 @@
           </div>
           <div class="form-group"><label>Education</label><select class="co-education"><option value="Below 10th">Below 10th</option><option value="10th Pass">10th Pass</option><option value="12th Pass">12th Pass</option><option value="Graduate" selected>Graduate</option><option value="Post Graduate">Post Graduate</option><option value="Doctorate">Doctorate</option><option value="Professional">Professional (CA/CS/CMA/LLB)</option></select></div>
           <div class="form-row">
-            <div class="form-group"><label>Employment Type</label><select class="co-employment"><option value="Salaried - Government">Salaried - Government</option><option value="Salaried - Private">Salaried - Private</option><option value="Self-Employed - Business" selected>Self-Employed - Business</option><option value="Self-Employed - Professional">Self-Employed - Professional</option></select></div>
+            <div class="form-group"><label>Employment Type</label><select class="co-employment"><option value="Salaried - Government">Salaried - Government</option><option value="Salaried - Private">Salaried - Private</option><option value="Self-Employed - Business" selected>Self-Employed - Business</option><option value="Self-Employed - Professional">Self-Employed - Professional</option><option value="Housewife">Housewife</option></select></div>
             <div class="form-group"><label>Company / Business</label><input type="text" class="co-company" placeholder="Company name" value=""></div>
           </div>
           <div class="form-row">
@@ -5449,6 +5543,7 @@
             <div class="form-group"><label>Annual income (₹)</label><input type="number" class="co-income" value="0" step="50000"></div>
             <div class="form-group"><label>Monthly debt (₹)</label><input type="number" class="co-debt" value="0" step="1000"></div>
           </div>
+          <div class="form-group"><label>CIBIL Score (300–900)</label><input type="number" class="co-cibil" placeholder="e.g. 720" min="300" max="900" value=""><div class="co-cibil-chip"></div></div>
           <div class="form-group"><label>Date of Birth</label><input type="date" class="co-dob" value=""></div>
           <div class="form-group"><label>Retirement Age (if applicable)</label><input type="number" class="co-retirement-age" placeholder="e.g. 60" value="60" step="1"></div>
         `;
@@ -5456,6 +5551,42 @@
         document.getElementById('coFeedback').textContent = 'Co-applicant added.';
         attachCoRemoveEvents();
       });
+
+      // Co-applicant profile: a Housewife has no income section
+      function applyCoProfile(sel) {
+        const card = sel.closest('.co-applicant-card');
+        const incomeInput = card && card.querySelector('.co-income');
+        if (!incomeInput) return;
+        const isHousewife = sel.value === 'Housewife';
+        incomeInput.closest('.form-group').style.display = isHousewife ? 'none' : '';
+        if (isHousewife) incomeInput.value = 0;
+      }
+      document.getElementById('coApplicantsContainer').addEventListener('change', function (e) {
+        if (e.target.classList && e.target.classList.contains('co-employment')) applyCoProfile(e.target);
+      });
+      document.getElementById('addCoApplicantBtn').addEventListener('click', function () {
+        document.querySelectorAll('#coApplicantsContainer .co-employment').forEach(applyCoProfile);
+      });
+      document.querySelectorAll('#coApplicantsContainer .co-employment').forEach(applyCoProfile);
+
+      // Live CIBIL band chip under each co-applicant's score field
+      function refreshCoCibilChip(input) {
+        const chip = input.closest('.form-group')?.querySelector('.co-cibil-chip');
+        if (!chip) return;
+        const raw = input.value.trim();
+        if (raw === '') { chip.innerHTML = '<span class="co-chip-none">Not set</span>'; return; }
+        const v = parseInt(raw);
+        if (!(v >= 300 && v <= 900)) { chip.innerHTML = '<span class="co-chip-invalid">Enter 300–900</span>'; return; }
+        const info = getCibilBand(v);
+        chip.innerHTML = '<span class="co-chip-' + info.cls + '">' + info.band + '</span>';
+      }
+      document.getElementById('coApplicantsContainer').addEventListener('input', function (e) {
+        if (e.target.classList && e.target.classList.contains('co-cibil')) refreshCoCibilChip(e.target);
+      });
+      document.getElementById('addCoApplicantBtn').addEventListener('click', function () {
+        document.querySelectorAll('#coApplicantsContainer .co-cibil').forEach(refreshCoCibilChip);
+      });
+      document.querySelectorAll('#coApplicantsContainer .co-cibil').forEach(refreshCoCibilChip);
 
       function attachCoRemoveEvents() {
         document.querySelectorAll('.co-applicant-card .remove-co').forEach(btn => {
@@ -5539,6 +5670,8 @@
           const coAge = getAgeFromDOB(coDob);
           const coRetirementAge = parseInt(card.querySelector('.co-retirement-age').value) || 60;
           const coRetirementInfo = calculateRetirementAge(coEmployment, coAge, coRetirementAge);
+          const coCibilRaw = parseInt(card.querySelector('.co-cibil')?.value);
+          const coCibil = (coCibilRaw >= 300 && coCibilRaw <= 900) ? coCibilRaw : null;
           coApplicants.push({
             name: card.querySelector('.co-name').value.trim(),
             phone: card.querySelector('.co-phone').value.trim(),
@@ -5549,8 +5682,10 @@
             company: card.querySelector('.co-company').value.trim(),
             location: card.querySelector('.co-location').value.trim(),
             pincode: card.querySelector('.co-pincode').value.trim(),
-            income: parseInt(card.querySelector('.co-income').value) || 0,
+            income: coEmployment === 'Housewife' ? 0 : (parseInt(card.querySelector('.co-income').value) || 0),
             debt: parseInt(card.querySelector('.co-debt').value) || 0,
+            cibilScore: coCibil,
+            cibilBand: coCibil ? getCibilBand(coCibil).band : '',
             dob: coDob,
             age: coAge,
             retirementAge: coRetirementAge,
@@ -5561,7 +5696,8 @@
         const loanType = document.getElementById('leadLoanType').value;
         const loanAmount = parseInt(document.getElementById('leadAmount').value) || 0;
         const credit = document.getElementById('leadCredit').value;
-        const institutionType = document.getElementById('institutionTypeSelect').value;
+        const profileFlags = getProfileFlags();
+        const institutionType = profileFlags.length ? 'NBFC' : document.getElementById('institutionTypeSelect').value;
         const institutionName = document.getElementById('specificInstitutionSelect').value || 'Not Selected';
 
         let assignedBA = document.getElementById('assignBA').value || '';
@@ -5676,7 +5812,8 @@
             retirementAge: borrowerRetirementAge,
             retirementInfo: borrowerRetirementInfo,
             cibilScore: globalCibilScore,
-            cibilBand: getCibilBand(globalCibilScore).band
+            cibilBand: getCibilBand(globalCibilScore).band,
+            profileFlags
           },
           coApplicants,
           references: refs,
@@ -5883,6 +6020,7 @@
                 <div class="lead-name">${escapeHtml(lead.borrower.name)}</div>
                 <div class="lead-phone">${escapeHtml(lead.borrower.phone)} · ${escapeHtml(lead.loanType)} · ₹${(lead.loanAmount/100000).toFixed(1)}L</div>
                 <div style="font-size:9px; color:#6a9ad4;">CIBIL: ${lead.borrower.cibilScore || '—'} (${cibilInfo})</div>
+                ${coCibilText(lead) ? `<div style="font-size:9px; color:#8ab4d6;">Co-app CIBIL: ${escapeHtml(coCibilText(lead))}</div>` : ''}
                 ${isBT ? `<div style="font-size:9px; color:#d4a86a;">🔄 BT + Top Up</div>` : ''}
                 ${lead.assignedLegal ? `<div style="font-size:9px; color:#6a9ad4;">⚖️ Legal: ${escapeHtml(getTeamMemberName(lead.assignedLegal, 'legal'))}</div>` : ''}
                 ${lead.assignedTechnical ? `<div style="font-size:9px; color:#d4a86a;">🔧 Technical: ${escapeHtml(getTeamMemberName(lead.assignedTechnical, 'technical'))}</div>` : ''}
@@ -6065,6 +6203,7 @@
             ${status === 'LEGAL_REWORK' && lead.legalReworkReason ? `<div class="report-section" style="background:rgba(212,168,74,0.08); border:1px solid rgba(212,168,74,0.3); border-radius:8px; padding:8px;"><div class="report-label">↩️ Admin sent this back for rework</div><div class="report-value">${escapeHtml(lead.legalReworkReason)}</div></div>` : ''}
             <div class="report-section"><div class="report-label">Borrower</div><div class="report-value">${escapeHtml(lead.borrower.name)}</div></div>
             <div class="report-section"><div class="report-label">CIBIL Score</div><div class="report-value">${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})</div></div>
+            ${coCibilText(lead) ? `<div class="report-section"><div class="report-label">Co-applicant CIBIL</div><div class="report-value">${escapeHtml(coCibilText(lead))}</div></div>` : ''}
             <div class="report-section"><div class="report-label">Property Address</div><div class="report-value">${escapeHtml(lead.property?.address || 'N/A')}</div></div>
             <div class="report-section"><div class="report-label">Legal Status</div><div class="report-value"><span class="badge ${lead.legalStatus === 'approved' ? 'badge-approved' : lead.legalStatus === 'declined' ? 'badge-declined' : 'badge-pending'}">${lead.legalStatus || 'Pending'}</span></div></div>
             <div class="report-section"><div class="report-label">Title Status</div><div class="report-value">${escapeHtml(lead.property?.titleStatus || 'N/A')}</div></div>
@@ -6118,6 +6257,7 @@
             ${status === 'NEW' || status === 'LEGAL_REVIEW' || status === 'LEGAL_REWORK' ? `<div class="report-section" style="background:rgba(106,154,212,0.08); border:1px solid rgba(106,154,212,0.3); border-radius:8px; padding:8px;"><div class="report-label">⏳ Waiting on Legal</div><div class="report-value">Technical review opens once Legal submits their assessment.</div></div>` : ''}
             <div class="report-section"><div class="report-label">Borrower</div><div class="report-value">${escapeHtml(lead.borrower.name)}</div></div>
             <div class="report-section"><div class="report-label">CIBIL Score</div><div class="report-value">${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})</div></div>
+            ${coCibilText(lead) ? `<div class="report-section"><div class="report-label">Co-applicant CIBIL</div><div class="report-value">${escapeHtml(coCibilText(lead))}</div></div>` : ''}
             <div class="report-section"><div class="report-label">Property Address</div><div class="report-value">${escapeHtml(lead.property?.address || 'N/A')}</div></div>
             <div class="report-section"><div class="report-label">Technical Status</div><div class="report-value"><span class="badge ${lead.technicalStatus === 'approved' ? 'badge-approved' : lead.technicalStatus === 'declined' ? 'badge-declined' : 'badge-pending'}">${lead.technicalStatus || 'Pending'}</span></div></div>
             <div class="report-section"><div class="report-label">Property Type</div><div class="report-value">${escapeHtml(lead.property?.type || 'N/A')}</div></div>
@@ -6181,6 +6321,7 @@
             ${status === 'REJECTED' && lead.rejectedReason ? `<div class="report-section" style="background:rgba(212,74,74,0.08); border:1px solid rgba(212,74,74,0.3); border-radius:8px; padding:8px;"><div class="report-label">❌ Rejection reason</div><div class="report-value">${escapeHtml(lead.rejectedReason)}</div></div>` : ''}
             <div class="report-section"><div class="report-label">Borrower</div><div class="report-value">${escapeHtml(lead.borrower.name)}</div></div>
             <div class="report-section"><div class="report-label">CIBIL Score</div><div class="report-value">${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})</div></div>
+            ${coCibilText(lead) ? `<div class="report-section"><div class="report-label">Co-applicant CIBIL</div><div class="report-value">${escapeHtml(coCibilText(lead))}</div></div>` : ''}
             <div class="report-section"><div class="report-label">Requested Loan Amount</div><div class="report-value">₹${(lead.loanAmount || 0).toLocaleString()}</div></div>
             <div class="report-section"><div class="report-label">Credit Status</div><div class="report-value"><span class="badge ${lead.creditStatus === 'approved' ? 'badge-approved' : lead.creditStatus === 'declined' ? 'badge-declined' : 'badge-pending'}">${lead.creditStatus || 'Pending'}</span></div></div>
             <div class="form-group">
@@ -6526,7 +6667,9 @@
           ${lead.assignedCredit ? `<div class="detail-row"><span>Assigned Credit</span><span>${escapeHtml(getTeamMemberName(lead.assignedCredit, 'credit'))}</span></div>` : ''}
           <div class="detail-row"><span>Legal Status</span><span style="color:${lead.legalStatus === 'approved' ? '#6ad49a' : lead.legalStatus === 'declined' ? '#d46a6a' : '#d4b86a'}">${escapeHtml(lead.legalStatus || 'pending')} ${lead.legalSubmitted ? '📤' : ''}</span></div>
           <div class="detail-row"><span>Technical Status</span><span style="color:${lead.technicalStatus === 'approved' ? '#6ad49a' : lead.technicalStatus === 'declined' ? '#d46a6a' : '#d4b86a'}">${escapeHtml(lead.technicalStatus || 'pending')} ${lead.technicalSubmitted ? '📤' : ''}</span></div>
+          ${profileFlagText(lead) ? `<div class="detail-row"><span>Profile type</span><span>${escapeHtml(profileFlagText(lead))}</span></div><div class="detail-row"><span>Channel</span><span style="color:#d4a86a;">NBFC only (profile rule)</span></div>` : ''}
           <div class="detail-row"><span>Co-applicants</span><span>${lead.coApplicants?.length || 0}</span></div>
+          ${(lead.coApplicants || []).map(c => `<div class="detail-row"><span>${escapeHtml(c.name || 'Co-applicant')} · CIBIL</span><span>${c.cibilScore ? c.cibilScore + ' (' + escapeHtml(c.cibilBand || getCibilBand(c.cibilScore).band) + ')' : '—'}</span></div>`).join('')}
           <div class="detail-row"><span>Created</span><span>${new Date(lead.createdAt).toLocaleDateString()}</span></div>
           ${lead.property ? `
             <div style="margin-top:10px; border-top:1px solid rgba(255,215,0,0.1); padding-top:10px;">
@@ -6656,8 +6799,11 @@
           updateTotalLoanAmount();
         }
 
+        const savedFlags = (lead.borrower && lead.borrower.profileFlags) || [];
+        document.querySelectorAll('.profile-flag').forEach(cb => { cb.checked = savedFlags.includes(cb.value); });
+        applyChannelRule();
         if (lead.institutionType) {
-          document.getElementById('institutionTypeSelect').value = lead.institutionType;
+          if (!savedFlags.length) document.getElementById('institutionTypeSelect').value = lead.institutionType;
           updateInstitutionSelect();
           document.getElementById('specificInstitutionSelect').value = lead.institutionName || '';
         }
@@ -6812,7 +6958,7 @@
         const lead = window._shareLead;
         if (!lead) return;
         const text =
-          `SOLITAIRE · Lead Report\nName: ${lead.borrower.name}\nPhone: ${lead.borrower.phone}\nCIBIL: ${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})\nEducation: ${lead.borrower.education || 'N/A'}\nAge: ${lead.borrower.age || 'N/A'} years\nEmployment: ${lead.borrower.employment || 'N/A'}\nMax Term: ${lead.borrower.retirementInfo?.maxTerm || 30} years\nLoan: ${lead.loanType} · ₹${(lead.loanAmount/100000).toFixed(1)}L\nCredit: ${lead.credit}\nDTI: ${document.getElementById('shareDti').textContent}\nLTV: ${document.getElementById('shareLtv').textContent}\nDecision: ${document.getElementById('shareResultBadge').textContent}\nInstitution: ${lead.institutionName}\nAssigned: ${lead.assignedBA ? getTeamMemberName(lead.assignedBA, 'ba') : 'Unassigned'}`;
+          `SOLITAIRE · Lead Report\nName: ${lead.borrower.name}\nPhone: ${lead.borrower.phone}\nCIBIL: ${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})${coCibilText(lead) ? '\nCo-applicant CIBIL: ' + coCibilText(lead) : ''}\nEducation: ${lead.borrower.education || 'N/A'}\nAge: ${lead.borrower.age || 'N/A'} years\nEmployment: ${lead.borrower.employment || 'N/A'}\nMax Term: ${lead.borrower.retirementInfo?.maxTerm || 30} years\nLoan: ${lead.loanType} · ₹${(lead.loanAmount/100000).toFixed(1)}L\nCredit: ${lead.credit}\nDTI: ${document.getElementById('shareDti').textContent}\nLTV: ${document.getElementById('shareLtv').textContent}\nDecision: ${document.getElementById('shareResultBadge').textContent}\nInstitution: ${lead.institutionName}\nAssigned: ${lead.assignedBA ? getTeamMemberName(lead.assignedBA, 'ba') : 'Unassigned'}`;
         navigator.clipboard.writeText(text).then(() => alert('📋 Copied to clipboard!')).catch(() => alert(
           '📋 Copy this:\n\n' + text));
       });
@@ -6849,7 +6995,7 @@
         const lead = window._shareLead;
         if (!lead) return;
         const content =
-          `SOLITAIRE · Underwriting Report\n============================\nLead ID: #${lead.id}\nDate: ${new Date().toLocaleDateString()}\n\nBorrower: ${lead.borrower.name}\nPhone: ${lead.borrower.phone}\nCIBIL: ${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})\nEmail: ${lead.borrower.email}\nEducation: ${lead.borrower.education || 'N/A'}\nAge: ${lead.borrower.age || 'N/A'} years\nEmployment: ${lead.borrower.employment}\nCompany: ${lead.borrower.company}\nRetirement Age: ${lead.borrower.retirementAge || 'N/A'} years\nMax Loan Term: ${lead.borrower.retirementInfo?.maxTerm || 30} years\nPension: ${lead.borrower.retirementInfo?.pensionFactor > 0 ? '50% Pension Available' : 'No Pension'}\n\nLoan Details:\nType: ${lead.loanType}\nAmount: ₹${(lead.loanAmount/100000).toFixed(1)}L\nCredit: ${lead.credit}\nInstitution: ${lead.institutionName}\n${lead.btTopUpData ? `\nBalance Transfer Details:\nCurrent Bank: ${lead.btTopUpData.currentBank || 'N/A'}\nBT Amount: ₹${(lead.btTopUpData.btAmount || 0).toLocaleString()}\nTop Up Amount: ₹${(lead.btTopUpData.topUpAmount || 0).toLocaleString()}\nCurrent Interest Rate: ${lead.btTopUpData.currentInterestRate || 0}%\nCurrent EMI: ₹${(lead.btTopUpData.currentEMI || 0).toLocaleString()}\nRemaining Tenure: ${lead.btTopUpData.remainingTenure || 0} months\n` : ''}\nFinancials:\nDTI: ${document.getElementById('shareDti').textContent}\nLTV: ${document.getElementById('shareLtv').textContent}\n\nDecision: ${document.getElementById('shareResultBadge').textContent}\n\nProperty:\nType: ${lead.property?.type || 'N/A'}\nValue: ₹${lead.property?.value ? (lead.property.value/100000).toFixed(1) + 'L' : 'N/A'}\nAddress: ${lead.property?.address || 'N/A'}\n\nCo-applicants: ${lead.coApplicants?.length || 0}\nReferences: ${lead.references?.length || 0}`;
+          `SOLITAIRE · Underwriting Report\n============================\nLead ID: #${lead.id}\nDate: ${new Date().toLocaleDateString()}\n\nBorrower: ${lead.borrower.name}\nPhone: ${lead.borrower.phone}\nCIBIL: ${lead.borrower.cibilScore || '—'} (${lead.borrower.cibilBand || '—'})${coCibilText(lead) ? '\nCo-applicant CIBIL: ' + coCibilText(lead) : ''}\nEmail: ${lead.borrower.email}\nEducation: ${lead.borrower.education || 'N/A'}\nAge: ${lead.borrower.age || 'N/A'} years\nEmployment: ${lead.borrower.employment}\nCompany: ${lead.borrower.company}\nRetirement Age: ${lead.borrower.retirementAge || 'N/A'} years\nMax Loan Term: ${lead.borrower.retirementInfo?.maxTerm || 30} years\nPension: ${lead.borrower.retirementInfo?.pensionFactor > 0 ? '50% Pension Available' : 'No Pension'}\n\nLoan Details:\nType: ${lead.loanType}\nAmount: ₹${(lead.loanAmount/100000).toFixed(1)}L\nCredit: ${lead.credit}\nInstitution: ${lead.institutionName}\n${lead.btTopUpData ? `\nBalance Transfer Details:\nCurrent Bank: ${lead.btTopUpData.currentBank || 'N/A'}\nBT Amount: ₹${(lead.btTopUpData.btAmount || 0).toLocaleString()}\nTop Up Amount: ₹${(lead.btTopUpData.topUpAmount || 0).toLocaleString()}\nCurrent Interest Rate: ${lead.btTopUpData.currentInterestRate || 0}%\nCurrent EMI: ₹${(lead.btTopUpData.currentEMI || 0).toLocaleString()}\nRemaining Tenure: ${lead.btTopUpData.remainingTenure || 0} months\n` : ''}\nFinancials:\nDTI: ${document.getElementById('shareDti').textContent}\nLTV: ${document.getElementById('shareLtv').textContent}\n\nDecision: ${document.getElementById('shareResultBadge').textContent}\n\nProperty:\nType: ${lead.property?.type || 'N/A'}\nValue: ₹${lead.property?.value ? (lead.property.value/100000).toFixed(1) + 'L' : 'N/A'}\nAddress: ${lead.property?.address || 'N/A'}\n\nCo-applicants: ${lead.coApplicants?.length || 0}\nReferences: ${lead.references?.length || 0}`;
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -6906,6 +7052,7 @@
                 <div class="value" style="font-size:12px;">Father: ${escapeHtml(c.father || 'N/A')} | Mother: ${escapeHtml(c.mother || 'N/A')}</div>
                 <div class="value" style="font-size:12px;">Education: ${escapeHtml(c.education || 'N/A')} | Age: ${escapeHtml(c.age || 'N/A')} years</div>
                 <div class="value" style="font-size:12px;">Employment: ${escapeHtml(c.employment || 'N/A')} | Income: ₹${(c.income || 0).toLocaleString()}</div>
+                <div class="value" style="font-size:12px;">CIBIL: ${c.cibilScore ? c.cibilScore + ' (' + escapeHtml(c.cibilBand || getCibilBand(c.cibilScore).band) + ')' : '—'}</div>
                 <div class="value" style="font-size:12px; color:#6a9ad4;">Max Term: ${c.retirementInfo?.maxTerm || 30} years | ${c.retirementInfo?.pensionFactor > 0 ? '50% Pension' : 'No Pension'}</div>
               </div>
             `).join('') || '<div class="value">None</div>'}
@@ -7090,6 +7237,7 @@
             ${dRow('Company', escapeHtml(lead.borrower.company || ''))}
             ${dRow('Location', place)}
             ${dRow('KYC status', kycVal)}
+            ${profileFlagText(lead) ? dRow('Profile type', escapeHtml(profileFlagText(lead))) : ''}
           </div>
           <div class="lead-section-title"><i class="fas fa-wallet"></i>Financials</div>
           <div class="lead-detail-grid">
@@ -7100,6 +7248,7 @@
             ${dRow('Annual income' + (coList.length ? ' (combined)' : ''), combinedIncome ? inr(combinedIncome) : '')}
             ${dRow('Monthly debt' + (coList.length ? ' (combined)' : ''), inr(combinedDebt))}
             ${coList.length ? dRow('Co-applicants', coList.map(c => escapeHtml(c.name || 'Unnamed')).join(', ')) : ''}
+            ${coList.some(c => c.cibilScore) ? dRow('Co-applicant CIBIL', coList.map(c => escapeHtml(c.name || 'Unnamed') + ' ' + (c.cibilScore ? c.cibilScore + ' (' + escapeHtml(c.cibilBand || getCibilBand(c.cibilScore).band) + ')' : '—')).join('<br>')) : ''}
           </div>${refBlock}`;
         info.innerHTML = `
           <div style="color:#f0e6d0;"><strong>${escapeHtml(lead.borrower.name)}</strong> · ${escapeHtml(lead.loanType)}</div>
@@ -7118,7 +7267,7 @@
           ${customerBlock}
           <button class="btn-secondary btn-sm" style="margin-top:10px; width:100%;" onclick="document.querySelector('.nav-item[data-screen=\\'pipeline\\']').click();">📊 View in Pipeline</button>
         `;
-        updateCibilDisplay(globalCibilScore);
+        updateCibilDisplay(getSimCibilScore(), true);
       }
 
       function runSimulator() {
@@ -7172,7 +7321,8 @@
         else if (credit === 'Fair') riskScore -= 10;
         else riskScore -= 25;
 
-        const cibilInfo = getCibilBand(globalCibilScore);
+        const effectiveCibil = getSimCibilScore();
+        const cibilInfo = getCibilBand(effectiveCibil);
         if (cibilInfo.band === 'Excellent') riskScore += 15;
         else if (cibilInfo.band === 'Good') riskScore += 5;
         else if (cibilInfo.band === 'Fair') riskScore -= 5;
@@ -7213,10 +7363,30 @@
           notes.innerHTML =
             '<strong>📋 Underwriting notes</strong><br>Risk factors: High DTI, LTV or FOIR, or poor credit. Declined. Recommend improving credit profile.' + foirNote;
         }
-        updateCibilDisplay(globalCibilScore);
+        updateCibilDisplay(effectiveCibil, true);
       }
 
       // Fill the simulator from the selected lead (loan, property value, combined income & debt, credit band, rate, tenure)
+      var simScores = null; // { primary, cos: [{name, score}] } for the lead shown in the simulator
+      function getSimCibilScore() {
+        const primary = (simScores && simScores.primary) || globalCibilScore;
+        const basis = document.getElementById('simCibilBasis')?.value || 'primary';
+        const all = [primary].concat(((simScores && simScores.cos) || []).map(c => c.score)).filter(n => n >= 300 && n <= 900);
+        if (basis === 'lowest' && all.length) return Math.min.apply(null, all);
+        if (basis === 'average' && all.length) return Math.round(all.reduce((a, b) => a + b, 0) / all.length);
+        return primary;
+      }
+      function renderSimCibilInfo() {
+        const wrap = document.getElementById('simCibilBasisWrap');
+        const list = document.getElementById('simCoCibilList');
+        if (!wrap || !list) return;
+        const cos = (simScores && simScores.cos) || [];
+        wrap.style.display = cos.length ? 'block' : 'none';
+        if (!cos.length) return;
+        const primary = (simScores && simScores.primary) || globalCibilScore;
+        list.innerHTML = 'Primary ' + primary + ' · ' + cos.map(c => escapeHtml(c.name || 'Co-applicant') + ' ' + c.score).join(' · ');
+      }
+
       function setSimSlider(id, value) {
         const el = document.getElementById(id);
         const v = Math.round(Number(value));
@@ -7237,6 +7407,11 @@
         const co = Array.isArray(lead.coApplicants) ? lead.coApplicants : [];
         const income = (Number(lead.borrower?.income) || 0) + co.reduce((sum, c) => sum + (Number(c.income) || 0), 0);
         const debt = (Number(lead.borrower?.debt) || 0) + co.reduce((sum, c) => sum + (Number(c.debt) || 0), 0);
+        simScores = {
+          primary: Number(lead.borrower?.cibilScore) || null,
+          cos: co.filter(c => c && c.cibilScore >= 300 && c.cibilScore <= 900).map(c => ({ name: c.name, score: Number(c.cibilScore) }))
+        };
+        renderSimCibilInfo();
         if (Number(lead.loanAmount) > 0) setSimSlider('simLoan', lead.loanAmount);
         if (Number(lead.property?.value) > 0) setSimSlider('simProp', lead.property.value);
         if (income > 0) setSimSlider('simIncome', income);
@@ -7270,6 +7445,7 @@
       document.getElementById('simIncome').addEventListener('input', runSimulator);
       document.getElementById('simDebt').addEventListener('input', runSimulator);
       document.getElementById('simCredit').addEventListener('change', runSimulator);
+      document.getElementById('simCibilBasis')?.addEventListener('change', runSimulator);
       document.getElementById('simRate')?.addEventListener('input', runSimulator);
       document.getElementById('simTenure')?.addEventListener('input', runSimulator);
 
@@ -7284,6 +7460,7 @@
           'Phone': l.borrower.phone,
           'CIBIL Score': l.borrower.cibilScore || '',
           'CIBIL Band': l.borrower.cibilBand || '',
+          'Co-applicant CIBIL': coCibilText(l),
           'Email': l.borrower.email,
           'Education': l.borrower.education || '',
           'Age': l.borrower.age || '',
@@ -7329,6 +7506,7 @@
           'Full Name': l.borrower.name,
           'Phone': l.borrower.phone,
           'CIBIL': l.borrower.cibilScore || '',
+          'Co-applicant CIBIL': coCibilText(l),
           'Email': l.borrower.email,
           'Loan Type': l.loanType,
           'Loan Amount': l.loanAmount,
@@ -7359,6 +7537,7 @@
           'Name': l.borrower.name,
           'Phone': l.borrower.phone,
           'CIBIL': l.borrower.cibilScore || '',
+          'Co-applicant CIBIL': coCibilText(l),
           'Loan Type': l.loanType,
           'Loan Amount': l.loanAmount,
           'Stage': l.stage,
