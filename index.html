@@ -2339,6 +2339,32 @@
       margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; font-size: 12px; line-height: 1.5;
       background: rgba(212, 168, 106, 0.1); border: 1px solid rgba(212, 168, 106, 0.35); color: #e0c28a;
     }
+
+    /* ===== LEAD SEARCH ===== */
+    .lead-search-input {
+      width: 100%; box-sizing: border-box; padding: 13px 14px; font-size: 14px; color: #f0e6d0;
+      background: #12121c; border: 1px solid rgba(201, 168, 76, 0.3); border-radius: 12px; outline: none;
+    }
+    .lead-search-input:focus { border-color: #c9a84c; box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.2); }
+    .search-hit {
+      padding: 12px 14px; margin-bottom: 8px; cursor: pointer; border-radius: 14px;
+      background: linear-gradient(160deg, #202030 0%, #181825 100%);
+      border: 1px solid rgba(201, 168, 76, 0.14); transition: 0.2s;
+    }
+    .search-hit:hover, .search-hit:active { border-color: #c9a84c; background: rgba(201, 168, 76, 0.08); }
+
+    /* ===== FIT TO BROWSER WINDOW (header always visible) ===== */
+    html, body { height: 100%; }
+    body { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+    #app, .splash-container {
+      height: min(780px, calc(100vh - 32px));
+      height: min(780px, calc(100dvh - 32px));
+    }
+    .app-header, .bottom-nav { flex-shrink: 0; }
+    .screen-container { min-height: 0; }
+    @media (max-width: 440px) {
+      #app, .splash-container { height: 100vh; height: 100dvh; }
+    }
   </style>
 </head>
 <body>
@@ -2505,7 +2531,7 @@
               <span id="notifBadge" style="display:none; position:absolute; top:-7px; right:-9px; background:#d46a6a; color:#fff; font-size:10px; font-weight:700; min-width:16px; height:16px; border-radius:8px; padding:0 4px; align-items:center; justify-content:center; line-height:16px; text-align:center;">0</span>
             </span><span>Notifications</span>
           </div>
-          <div class="hm-item"><i class="fas fa-search"></i><span>Search</span></div>
+          <div class="hm-item"><i class="fas fa-search" id="searchIcon" title="Search leads"></i><span>Search</span></div>
           <div class="hm-item"><i class="fas fa-key" id="changePasswordIcon" title="Change Password" style="color:#c9a84c; cursor:pointer;"></i><span>Change Password</span></div>
           <div class="hm-item"><i class="fas fa-sliders-h"></i><span>Settings</span></div>
           <div class="hm-item hm-danger"><i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i><span>Logout</span></div>
@@ -2524,6 +2550,18 @@
           </div>
         </div>
         <div id="notifList" style="max-height:60vh; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- LEAD SEARCH -->
+    <div class="share-overlay" id="searchOverlay">
+      <div class="share-card" style="max-width:420px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h2 style="margin:0; font-size:16px;"><i class="fas fa-search" style="color:#c9a84c;"></i> Search leads</h2>
+          <span id="searchCloseBtn" style="cursor:pointer; font-size:20px; color:#c8bca8; padding:0 4px;">&times;</span>
+        </div>
+        <input type="search" id="leadSearchInput" class="lead-search-input" placeholder="Type client name or phone number" autocomplete="off">
+        <div id="leadSearchResults" style="max-height:55vh; overflow-y:auto; margin-top:12px;"></div>
       </div>
     </div>
 
@@ -7688,6 +7726,117 @@
           if (target) target.classList.add('active');
           if (screen === 'reports') renderReports();
         });
+      });
+
+      // ================================================================
+      // LEAD SEARCH (header menu → Search): find by client name or phone, open the lead in Pipeline
+      // ================================================================
+      function getRoleLeads() {
+        const role = currentRole || 'guest';
+        if (role === 'business') return leads.filter(l => l.assignedBA === currentUser);
+        if (role === 'legal') return leads.filter(l => l.assignedLegal === currentUser);
+        if (role === 'technical') return leads.filter(l => l.assignedTechnical === currentUser);
+        if (role === 'credit') return leads.filter(l => l.assignedCredit === currentUser);
+        if (role === 'customer') {
+          const phone = currentUserData?.mobile;
+          return leads.filter(l => l.borrower.phone === phone || l.borrower.email === currentUser);
+        }
+        return leads;
+      }
+
+      function leadStageBadge(stage) {
+        return stage.includes('Declined') ? 'badge-declined'
+          : stage === 'New' ? 'badge-new'
+          : stage === 'Contacted' ? 'badge-contacted'
+          : stage === 'Document Collection' ? 'badge-docs'
+          : stage === 'Underwriting' ? 'badge-underwriting'
+          : stage === 'Approved' ? 'badge-approved'
+          : stage.startsWith('Legal') ? 'badge-legal'
+          : stage.startsWith('Technical') ? 'badge-technical'
+          : 'badge-pending';
+      }
+
+      let lastSearchHits = [];
+      function renderLeadSearch() {
+        const input = document.getElementById('leadSearchInput');
+        const out = document.getElementById('leadSearchResults');
+        const q = input.value.trim().toLowerCase();
+        const qDigits = q.replace(/\D/g, '');
+        lastSearchHits = [];
+        if (!q) {
+          out.innerHTML = '<div style="color:#6a5f48; text-align:center; padding:18px; font-size:13px;">Type a client name or phone number.</div>';
+          return;
+        }
+        getRoleLeads().forEach(l => {
+          const b = l.borrower || {};
+          const nameHit = (b.name || '').toLowerCase().includes(q);
+          const phoneHit = qDigits.length >= 3 && String(b.phone || '').replace(/\D/g, '').includes(qDigits);
+          let via = '';
+          if (!nameHit && !phoneHit) {
+            const co = (l.coApplicants || []).find(c =>
+              (c.name || '').toLowerCase().includes(q) ||
+              (qDigits.length >= 3 && String(c.phone || '').replace(/\D/g, '').includes(qDigits)));
+            if (co) via = 'Co-applicant: ' + (co.name || co.phone);
+            else return;
+          }
+          lastSearchHits.push({ lead: l, via });
+        });
+        if (!lastSearchHits.length) {
+          out.innerHTML = '<div style="color:#6a5f48; text-align:center; padding:18px; font-size:13px;">No leads found for “' + escapeHtml(input.value.trim()) + '”.</div>';
+          return;
+        }
+        out.innerHTML = lastSearchHits.slice(0, 25).map(h => {
+          const l = h.lead, b = l.borrower || {}, stage = l.stage || 'New';
+          return `<div class="search-hit" data-id="${escapeHtml(l.id)}">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <strong style="color:#f0e6d0;">${escapeHtml(b.name || 'Unnamed')}</strong>
+              <span class="badge ${leadStageBadge(stage)}">${escapeHtml(stage)}</span>
+            </div>
+            <div style="font-size:12px; color:#a89b7a; margin-top:4px;">📞 ${escapeHtml(b.phone || '—')} · ${escapeHtml(l.loanType || '')} · ₹${(Number(l.loanAmount) || 0).toLocaleString('en-IN')}</div>
+            ${h.via ? `<div style="font-size:11px; color:#6a9ad4; margin-top:3px;">${escapeHtml(h.via)}</div>` : ''}
+          </div>`;
+        }).join('') + (lastSearchHits.length > 25 ? '<div style="font-size:11px; color:#8a7f66; text-align:center; padding:6px;">Showing first 25. Type more to narrow down.</div>' : '');
+      }
+
+      function openLeadSearch() {
+        const overlay = document.getElementById('searchOverlay');
+        const input = document.getElementById('leadSearchInput');
+        if (!overlay || !input) return;
+        input.value = '';
+        renderLeadSearch();
+        overlay.classList.add('show');
+        setTimeout(() => input.focus(), 80);
+      }
+      function closeLeadSearch() {
+        const overlay = document.getElementById('searchOverlay');
+        if (overlay) overlay.classList.remove('show');
+      }
+      function openLeadFromSearch(id) {
+        const lead = leads.find(l => String(l.id) === String(id));
+        if (!lead) return;
+        closeLeadSearch();
+        const pipelineTab = document.querySelector('.nav-item[data-screen="pipeline"]');
+        if (pipelineTab) pipelineTab.click();
+        showDetail(lead);
+        const dv = document.getElementById('detailView');
+        const sc = document.getElementById('screenContainer');
+        if (dv && sc) setTimeout(() => {
+          const top = dv.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 8;
+          sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        }, 120);
+      }
+
+      document.getElementById('searchIcon')?.addEventListener('click', openLeadSearch);
+      document.getElementById('searchCloseBtn')?.addEventListener('click', closeLeadSearch);
+      document.getElementById('searchOverlay')?.addEventListener('click', e => { if (e.target.id === 'searchOverlay') closeLeadSearch(); });
+      document.getElementById('leadSearchInput')?.addEventListener('input', renderLeadSearch);
+      document.getElementById('leadSearchInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && lastSearchHits.length) { e.preventDefault(); openLeadFromSearch(lastSearchHits[0].lead.id); }
+        if (e.key === 'Escape') closeLeadSearch();
+      });
+      document.getElementById('leadSearchResults')?.addEventListener('click', e => {
+        const hit = e.target.closest('.search-hit');
+        if (hit) openLeadFromSearch(hit.dataset.id);
       });
 
       // ================================================================
