@@ -7790,6 +7790,7 @@
       const XL_R = 9;
       const XL_EDGE = 1.4; // thin edge columns keep the corner images exactly on the corners
       function xlCornerFactory(wb) {
+        return null; // simple square borders (rounded corner images switched off)
         try {
           if (typeof document === 'undefined') return null;
           document.createElement('canvas').getContext('2d');
@@ -7999,35 +8000,153 @@
         return ws;
       }
 
-      // Summary page with glossy KPI panels and breakdown tables (live formulas that point at the Leads sheet)
-      // Layout: [edge] [4 content columns B..E] [edge] [shadow]
+      // ---- Charts for the dashboard (drawn on a canvas, placed as pictures) ----
+      const XL_CHART_COLORS = ['#C9A84C', '#5B8FD6', '#9B7BD1', '#4FB3BF', '#D98C5F', '#4FB286', '#C77AA6', '#7FA35A', '#9A9AB0'];
+      const XL_STAGE_CHART = { green: '#4FB286', red: '#D46A6A', grey: '#9A9AB0', blue: '#5B8FD6', amber: '#E0B84F', purple: '#9B7BD1', copper: '#D98C5F' };
+      const XL_CHART_FONT = 'Calibri, Carlito, "Segoe UI", Arial, sans-serif';
+      function xlShort(n) {
+        n = Number(n) || 0;
+        if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
+        if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1).replace(/\.0$/, '') + ' L';
+        return '₹' + Math.round(n).toLocaleString('en-IN');
+      }
+      function xlCanvasOK() {
+        try { if (typeof document === 'undefined') return false; document.createElement('canvas').getContext('2d'); return true; }
+        catch (e) { return false; }
+      }
+      function xlRoundRectPath(g, x, y, w, h, r) {
+        g.beginPath();
+        g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r);
+        g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r);
+        g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r);
+        g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath();
+      }
+      function xlChartBase(w, h, title) {
+        const S = 2, cv = document.createElement('canvas');
+        cv.width = w * S; cv.height = h * S;
+        const g = cv.getContext('2d');
+        g.scale(S, S);
+        g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, w, h);
+        g.strokeStyle = '#A8832F'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2);
+        g.fillStyle = '#14141E'; g.font = '700 13px ' + XL_CHART_FONT; g.textBaseline = 'alphabetic';
+        g.fillText(title.toUpperCase(), 16, 27);
+        const grad = g.createLinearGradient(16, 0, w - 16, 0);
+        grad.addColorStop(0, '#C9A84C'); grad.addColorStop(1, 'rgba(201,168,76,0.15)');
+        g.fillStyle = grad; g.fillRect(16, 34, w - 32, 2);
+        return { cv, g };
+      }
+      function xlFit(g, text, maxW) {
+        let t = String(text);
+        while (t.length > 3 && g.measureText(t).width > maxW) t = t.slice(0, -2);
+        return t === String(text) ? t : t + '…';
+      }
+      // Horizontal bars: items = [{label, value, color, text}]
+      function xlBarsChart(w, h, title, items) {
+        const { cv, g } = xlChartBase(w, h, title);
+        if (!items.length) return cv.toDataURL('image/png');
+        const top = 50, bottom = 14, left = 16, labelW = 120, valueW = 64;
+        const rowH = Math.min(28, (h - top - bottom) / items.length);
+        const max = Math.max.apply(null, items.map(i => i.value)) || 1;
+        items.forEach((it, i) => {
+          const y = top + i * rowH, bh = Math.min(16, rowH * 0.6);
+          g.fillStyle = '#4A4A5C'; g.font = '12px ' + XL_CHART_FONT; g.textBaseline = 'middle';
+          g.fillText(xlFit(g, it.label, labelW - 6), left, y + rowH / 2);
+          const bx = left + labelW, bw = Math.max(3, (w - left * 2 - labelW - valueW) * (it.value / max));
+          g.fillStyle = '#F3EEDC'; xlRoundRectPath(g, bx, y + (rowH - bh) / 2, w - left * 2 - labelW - valueW, bh, bh / 2); g.fill();
+          g.fillStyle = it.color; xlRoundRectPath(g, bx, y + (rowH - bh) / 2, bw, bh, bh / 2); g.fill();
+          g.fillStyle = '#14141E'; g.font = '700 12px ' + XL_CHART_FONT;
+          g.fillText(it.text, bx + bw + 8 > w - valueW + 8 ? w - valueW + 8 : bx + bw + 8, y + rowH / 2);
+        });
+        return cv.toDataURL('image/png');
+      }
+      // Donut with legend: items = [{label, value, color}]
+      function xlDonutChart(w, h, title, items) {
+        const { cv, g } = xlChartBase(w, h, title);
+        const total = items.reduce((a, b) => a + b.value, 0);
+        if (!total) return cv.toDataURL('image/png');
+        const cx = 100, cy = 50 + (h - 50) / 2, R = Math.min(70, (h - 70) / 2), r = R * 0.58;
+        let a0 = -Math.PI / 2;
+        items.forEach(it => {
+          const a1 = a0 + (it.value / total) * Math.PI * 2;
+          g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, a0, a1); g.closePath();
+          g.fillStyle = it.color; g.fill();
+          g.strokeStyle = '#FFFFFF'; g.lineWidth = 2; g.stroke();
+          a0 = a1;
+        });
+        g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fillStyle = '#FFFFFF'; g.fill();
+        g.fillStyle = '#14141E'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.font = '700 20px ' + XL_CHART_FONT; g.fillText(String(total), cx, cy - 6);
+        g.font = '10px ' + XL_CHART_FONT; g.fillStyle = '#7A7260'; g.fillText('LEADS', cx, cy + 12);
+        g.textAlign = 'left';
+        const lx = 200, rowH = Math.min(24, (h - 62) / items.length);
+        items.forEach((it, i) => {
+          const y = 56 + i * rowH + rowH / 2;
+          g.fillStyle = it.color; xlRoundRectPath(g, lx, y - 5, 10, 10, 3); g.fill();
+          g.fillStyle = '#4A4A5C'; g.font = '12px ' + XL_CHART_FONT; g.textBaseline = 'middle';
+          g.fillText(xlFit(g, it.label, w - lx - 70), lx + 18, y);
+          g.fillStyle = '#14141E'; g.font = '700 12px ' + XL_CHART_FONT; g.textAlign = 'right';
+          g.fillText(it.value + '  ' + Math.round(it.value / total * 100) + '%', w - 16, y); g.textAlign = 'left';
+        });
+        return cv.toDataURL('image/png');
+      }
+      // Columns: items = [{label, value, sub}]
+      function xlColumnsChart(w, h, title, items) {
+        const { cv, g } = xlChartBase(w, h, title);
+        const top = 56, bottom = 46, left = 24, right = 24;
+        const max = Math.max.apply(null, items.map(i => i.value).concat([1]));
+        const slot = (w - left - right) / items.length, bw = Math.min(40, slot * 0.55);
+        g.strokeStyle = '#EFE9D4'; g.lineWidth = 1;
+        for (let k = 0; k <= 3; k++) { const y = top + (h - top - bottom) * k / 3; g.beginPath(); g.moveTo(left, y); g.lineTo(w - right, y); g.stroke(); }
+        items.forEach((it, i) => {
+          const bh = Math.max(2, (h - top - bottom) * (it.value / max)), x = left + i * slot + (slot - bw) / 2, y = h - bottom - bh;
+          const gr = g.createLinearGradient(0, y, 0, y + bh);
+          gr.addColorStop(0, '#E6C566'); gr.addColorStop(1, '#B38F36');
+          g.fillStyle = gr; xlRoundRectPath(g, x, y, bw, bh, Math.min(6, bw / 3)); g.fill();
+          g.fillStyle = '#14141E'; g.font = '700 12px ' + XL_CHART_FONT; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+          g.fillText(String(it.value), x + bw / 2, y - 5);
+          g.fillStyle = '#4A4A5C'; g.font = '11px ' + XL_CHART_FONT;
+          g.fillText(it.label, x + bw / 2, h - bottom + 16);
+          g.fillStyle = '#7A7260'; g.font = '10px ' + XL_CHART_FONT;
+          g.fillText(it.sub || '', x + bw / 2, h - bottom + 30);
+        });
+        g.textAlign = 'left';
+        return cv.toDataURL('image/png');
+      }
+
+      // Summary page: KPI panels, charts and management tables (live formulas that point at the Leads sheet)
+      // Layout: [edge] [5 content columns B..F] [edge]
       function dashboardSheet(wb, sheets, stamp, imgs) {
         const L = sheets.find(s => s.name === 'Leads');
         const A = sheets.find(s => s.name === 'Applicant');
-        const N = L.rows.length;
+        const T = sheets.find(s => s.name === 'Team & Status');
+        const N = L.rows.length, NC = 5, nT = NC + 2;
         const colOf = (spec, h) => colLetter(spec.cols.findIndex(c => c.h === h) + 2);
         const rng = (spec, h) => "'" + spec.name + "'!$" + colOf(spec, h) + '$5:$' + colOf(spec, h) + '$' + (4 + spec.rows.length);
         const stageR = rng(L, 'Stage'), loanR = rng(L, 'Loan Amount (₹)'), idR = rng(L, 'Lead ID'),
-          typeR = rng(L, 'Loan Type'), chanR = rng(L, 'Channel');
+          typeR = rng(L, 'Loan Type'), chanR = rng(L, 'Channel'), baR = rng(L, 'Assigned BA'), createdR = rng(L, 'Created');
 
         const ws = wb.addWorksheet('Dashboard', {
           properties: { tabColor: { argb: XL.ink } },
           views: [{ showGridLines: false }],
           pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
         });
-        ws.columns = [{ width: XL_EDGE }, { width: 27 }, { width: 27 }, { width: 27 }, { width: 27 }, { width: XL_EDGE }, { width: 1.3 }];
-        xlBanner(ws, 6, 'Portfolio Dashboard', stamp + '  ·  ' + N + ' lead' + (N === 1 ? '' : 's'));
+        ws.columns = [{ width: XL_EDGE }].concat([1, 2, 3, 4, 5].map(() => ({ width: 22 })), [{ width: XL_EDGE }, { width: 1.3 }]);
+        xlBanner(ws, nT, 'Management Dashboard', stamp + '  ·  ' + N + ' lead' + (N === 1 ? '' : 's'));
         ws.getRow(4).height = 10;
-        xlFrame(ws, 1, 1, 6, 2, !!imgs, false);
-        xlRound(ws, imgs, 1, 1, 6, 2, true, false);
+        xlFrame(ws, 1, 1, nT, 2, !!imgs, false);
+        xlRound(ws, imgs, 1, 1, nT, 2, true, false);
 
+        // ---- numbers used by tiles, charts and tables ----
         const sum = a => a.reduce((x, y) => x + y, 0);
-        const loans = L.rows.map(r => Number(r['Loan Amount (₹)']) || 0);
-        const stages = L.rows.map(r => r['Stage'] || '');
-        const approved = stages.filter(s => s === 'Approved').length;
-        const declined = stages.filter(s => String(s).includes('Declined')).length;
+        const amtOf = r => Number(r['Loan Amount (₹)']) || 0;
+        const isApproved = r => r['Stage'] === 'Approved';
+        const isDeclined = r => String(r['Stage'] || '').includes('Declined');
+        const approvedRows = L.rows.filter(isApproved), declinedRows = L.rows.filter(isDeclined);
+        const openRows = L.rows.filter(r => !isApproved(r) && !isDeclined(r));
         const scores = A ? A.rows.map(r => Number(r['CIBIL Score'])).filter(x => x >= 300 && x <= 900) : [];
         const gap = { style: 'thick', color: { argb: XL.white } };
+        const colLast = nT - 1; // last content column (F)
 
         function tile(r, c, label, value, fmt, formula) {
           const lc = ws.getCell(r, c);
@@ -8035,50 +8154,101 @@
           lc.font = xlFont(9, true, XL.gold);
           lc.fill = xlGloss(GLOSS_INK);
           lc.alignment = { vertical: 'middle', horizontal: 'center' };
-          lc.border = { left: c === 2 ? undefined : gap, right: c === 5 ? undefined : gap };
+          lc.border = { left: c === 2 ? undefined : gap, right: c === colLast ? undefined : gap };
           const vc = ws.getCell(r + 1, c);
           vc.value = formula ? { formula, result: value } : value;
           if (fmt) vc.numFmt = fmt;
-          vc.font = xlFont(18, true, XL.ink);
+          vc.font = xlFont(17, true, XL.ink);
           vc.fill = xlGloss(GLOSS_CREAM);
           vc.alignment = { vertical: 'middle', horizontal: 'center' };
-          vc.border = { left: c === 2 ? undefined : gap, right: c === 5 ? undefined : gap };
+          vc.border = { left: c === 2 ? undefined : gap, right: c === colLast ? undefined : gap };
         }
         function tileRow(r, tiles) {
           ws.getRow(r).height = 22;
           ws.getRow(r + 1).height = 42;
-          [1, 6].forEach(c => {
-            ws.getCell(r, c).fill = xlGloss(GLOSS_INK);
-            ws.getCell(r + 1, c).fill = xlGloss(GLOSS_CREAM);
-          });
+          [1, nT].forEach(c => { ws.getCell(r, c).fill = xlGloss(GLOSS_INK); ws.getCell(r + 1, c).fill = xlGloss(GLOSS_CREAM); });
           tiles.forEach((t, i) => tile(r, i + 2, t[0], t[1], t[2], t[3]));
-          for (let c = 1; c <= 6; c++) {
+          for (let c = 1; c <= nT; c++) {
             const b = ws.getCell(r + 1, c);
             b.border = Object.assign({}, b.border, { bottom: xlFrameEdge });
           }
-          xlFrame(ws, 1, r, 6, r + 1, !!imgs, !!imgs);
-          xlShadow(ws, 1, r, 6, r + 1);
-          xlRound(ws, imgs, 1, r, 6, r + 1, true, true);
+          xlFrame(ws, 1, r, nT, r + 1, !!imgs, !!imgs);
+          xlShadow(ws, 1, r, nT, r + 1);
+          xlRound(ws, imgs, 1, r, nT, r + 1, true, true);
         }
+        const loans = L.rows.map(amtOf);
+        const declinedVal = sum(declinedRows.map(amtOf));
         tileRow(5, [
           ['Total leads', N, '0', 'COUNTA(' + idR + ')'],
           ['Total loan amount', sum(loans), XL_INR, 'SUM(' + loanR + ')'],
           ['Average ticket', N ? sum(loans) / N : 0, XL_INR, 'IFERROR(AVERAGE(' + loanR + '),0)'],
-          ['Conversion rate', N ? approved / N : 0, '0.0%', 'IFERROR(COUNTIF(' + stageR + ',"Approved")/COUNTA(' + idR + '),0)']
-        ]);
-        ws.getRow(9).height = 8;
-        tileRow(10, [
-          ['Approved', approved, '0', 'COUNTIF(' + stageR + ',"Approved")'],
-          ['Declined', declined, '0', 'COUNTIF(' + stageR + ',"*Declined*")'],
-          ['In progress', N - approved - declined, '0', 'B6-B11-C11'],
+          ['Conversion rate', N ? approvedRows.length / N : 0, '0.0%', 'IFERROR(COUNTIF(' + stageR + ',"Approved")/COUNTA(' + idR + '),0)'],
           ['Average CIBIL', scores.length ? Math.round(sum(scores) / scores.length) : 0, '0',
             A ? 'IFERROR(ROUND(AVERAGE(' + rng(A, 'CIBIL Score') + '),0),0)' : null]
         ]);
+        ws.getRow(9).height = 8;
+        tileRow(10, [
+          ['Approved', approvedRows.length, '0', 'COUNTIF(' + stageR + ',"Approved")'],
+          ['Approved value', sum(approvedRows.map(amtOf)), XL_INR, 'SUMIF(' + stageR + ',"Approved",' + loanR + ')'],
+          ['Declined', declinedRows.length, '0', 'COUNTIF(' + stageR + ',"*Declined*")'],
+          ['In progress', openRows.length, '0', 'B6-B11-D11'],
+          ['Pipeline value', sum(openRows.map(amtOf)), XL_INR, 'C6-C11-SUMIF(' + stageR + ',"*Declined*",' + loanR + ')']
+        ]);
         ws.getRow(14).height = 8;
+        let next = 15;
 
-        function table(startRow, title, headLabel, keyR, kind, keys) {
-          ws.mergeCells(startRow, 2, startRow, 5);
-          [1, 6].forEach(c => { ws.getCell(startRow, c).fill = xlGloss(GLOSS_INK); });
+        // ---- charts ----
+        const countBy = kind => {
+          const m = {};
+          L.rows.forEach(r => { const k = r[kind] || ''; if (k) m[k] = (m[k] || 0) + 1; });
+          return Object.keys(m).sort((a, b) => m[b] - m[a]);
+        };
+        const stageKeys = countBy('Stage'), typeKeys = countBy('Loan Type'), chanKeys = countBy('Channel');
+        const today = xlsxDate(new Date());
+        const months = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
+          months.push({ y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d });
+        }
+        const inMonth = (r, mo) => r['Created'] && r['Created'] >= mo.d && r['Created'] < new Date(Date.UTC(mo.y, mo.m, 1));
+        const baNames = (() => {
+          const m = {};
+          L.rows.forEach(r => { const k = r['Assigned BA'] || 'Unassigned'; m[k] = (m[k] || 0) + amtOf(r); });
+          return Object.keys(m).sort((a, b) => m[b] - m[a]).slice(0, 8);
+        })();
+        if (xlCanvasOK()) {
+          try {
+            const W = 380, H = 250, GAP = 12, rowPt = 19, rowsFor = 10;
+            const mix = (kinds, colorFn) => kinds.map((k, i) => ({ label: k, value: L.rows.filter(r => (r['Loan Type'] || '') === k).length, color: colorFn(k, i) }));
+            const place = (png, left, startRow) => {
+              const id = wb.addImage({ base64: png, extension: 'png' });
+              const colPx = 22 * 7, EMU = 9525;
+              const nc = 1 + Math.floor(left / colPx), off = (left - Math.floor(left / colPx) * colPx) * EMU;
+              ws.addImage(id, { tl: { nativeCol: nc, nativeColOff: Math.round(off), nativeRow: startRow - 1, nativeRowOff: 0 }, ext: { width: W, height: H }, editAs: 'oneCell' });
+            };
+            for (let i = 0; i < rowsFor * 2 + 1; i++) ws.getRow(next + i).height = i === rowsFor ? 8 : rowPt;
+            const c1 = xlBarsChart(W, H, 'Pipeline by stage', stageKeys.slice(0, 9).map(k => ({
+              label: k, value: L.rows.filter(r => r['Stage'] === k).length,
+              color: XL_STAGE_CHART[xlToneFor('stage', k)] || '#C9A84C', text: String(L.rows.filter(r => r['Stage'] === k).length) })));
+            const c2 = xlDonutChart(W, H, 'Loan type mix', mix(typeKeys.slice(0, 7), (k, i) => XL_CHART_COLORS[i % XL_CHART_COLORS.length]));
+            const c3 = xlColumnsChart(W, H, 'Leads per month (last 6)', months.map(mo => {
+              const rows = L.rows.filter(r => inMonth(r, mo));
+              return { label: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][mo.m - 1], value: rows.length, sub: xlShort(sum(rows.map(amtOf))) };
+            }));
+            const c4 = xlBarsChart(W, H, 'Loan value by associate', baNames.slice(0, 7).map((k, i) => {
+              const v = sum(L.rows.filter(r => (r['Assigned BA'] || 'Unassigned') === k).map(amtOf));
+              return { label: k, value: v, color: XL_CHART_COLORS[i % XL_CHART_COLORS.length], text: xlShort(v) };
+            }));
+            place(c1, 0, next); place(c2, W + GAP, next);
+            place(c3, 0, next + rowsFor + 1); place(c4, W + GAP, next + rowsFor + 1);
+            next += rowsFor * 2 + 2;
+          } catch (e) { /* charts are optional */ }
+        }
+
+        // ---- generic management table: heads (5), rows built from a row-number callback ----
+        function dtable(startRow, title, heads, build, barCol) {
+          ws.mergeCells(startRow, 2, startRow, colLast);
+          [1, nT].forEach(c => { ws.getCell(startRow, c).fill = xlGloss(GLOSS_INK); });
           const bar = ws.getCell(startRow, 2);
           bar.value = title.toUpperCase();
           bar.font = xlFont(11, true, XL.gold);
@@ -8087,82 +8257,266 @@
           ws.getRow(startRow).height = 26;
           const hr = ws.getRow(startRow + 1);
           hr.height = 24;
-          for (let c = 1; c <= 6; c++) {
+          for (let c = 1; c <= nT; c++) {
             const cell = hr.getCell(c);
-            if (c >= 2 && c <= 5) {
-              const j = c - 2;
-              cell.value = [headLabel, 'Leads', 'Share', 'Loan amount'][j];
+            if (c >= 2 && c <= colLast) {
+              cell.value = heads[c - 2];
               cell.font = xlFont(10, true, XL.ink);
-              cell.alignment = { vertical: 'middle', horizontal: j === 0 ? 'left' : 'center', indent: j === 0 ? 1 : 0 };
+              cell.alignment = { vertical: 'middle', horizontal: c === 2 ? 'left' : 'center', indent: c === 2 ? 1 : 0 };
             }
             cell.fill = xlGloss(GLOSS_GOLD);
             cell.border = { top: xlGoldEdge, left: xlGoldEdge, right: xlGoldEdge, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
           }
           const r0 = startRow + 2;
-          keys.forEach((k, i) => {
-            const r = r0 + i;
-            const row = ws.getRow(r);
+          const built = build(r0);
+          const align = a => ({ vertical: 'middle', horizontal: a === 'c' ? 'center' : a === 'r' ? 'right' : 'left', indent: a === 'c' ? 0 : 1 });
+          built.rows.forEach((spec, i) => {
+            const row = ws.getRow(r0 + i);
             row.height = 21;
             const zebra = i % 2 === 0 ? XL.white : XL.cream;
-            [1, 6].forEach(ec => { const e = row.getCell(ec); e.fill = xlFill(zebra); e.border = xlBorder; });
-            const cnt = L.rows.filter(x => (x[kind] || '') === k).length;
-            const amt = sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0));
-            const cells = [
-              { v: k }, { v: { formula: 'COUNTIF(' + keyR + ',B' + r + ')', result: cnt }, center: true },
-              { v: { formula: 'IFERROR(C' + r + '/$B$6,0)', result: N ? cnt / N : 0 }, fmt: '0.0%', center: true },
-              { v: { formula: 'SUMIF(' + keyR + ',B' + r + ',' + loanR + ')', result: amt }, fmt: XL_INR, right: true }
-            ];
-            cells.forEach((cd, j) => {
+            [1, nT].forEach(ec => { const e = row.getCell(ec); e.fill = xlFill(zebra); e.border = xlBorder; });
+            spec.forEach((cd, j) => {
               const c = row.getCell(j + 2);
               c.value = cd.v;
               if (cd.fmt) c.numFmt = cd.fmt;
               c.border = xlBorder;
               c.fill = xlFill(zebra);
-              c.font = xlFont(10, j === 1, XL.text);
-              c.alignment = { vertical: 'middle', horizontal: cd.center ? 'center' : cd.right ? 'right' : 'left', indent: cd.center ? 0 : 1 };
+              c.font = xlFont(10, !!cd.bold, XL.text);
+              c.alignment = align(cd.a || 'l');
+              if (cd.tone && XL_TONES[cd.tone]) { c.fill = xlFill(XL_TONES[cd.tone].fill); c.font = xlFont(10, true, XL_TONES[cd.tone].font); }
             });
-            if (kind === 'Stage' || kind === 'Channel') {
-              const tone = XL_TONES[xlToneFor(kind === 'Stage' ? 'stage' : 'channel', k)];
-              if (tone) { const c0 = row.getCell(2); c0.fill = xlFill(tone.fill); c0.font = xlFont(10, true, tone.font); }
-            }
           });
-          const rl = r0 + keys.length - 1;
-          const tr = ws.getRow(rl + 1);
+          const rl = r0 + built.rows.length - 1, tr = ws.getRow(rl + 1);
           tr.height = 24;
-          const totals = [
-            { v: 'TOTAL' },
-            { v: { formula: 'SUM(C' + r0 + ':C' + rl + ')', result: sum(keys.map(k => L.rows.filter(x => (x[kind] || '') === k).length)) }, center: true },
-            { v: { formula: 'SUM(D' + r0 + ':D' + rl + ')', result: 1 }, fmt: '0.0%', center: true },
-            { v: { formula: 'SUM(E' + r0 + ':E' + rl + ')', result: sum(keys.map(k => sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0)))) }, fmt: XL_INR, right: true }
-          ];
-          for (let c = 1; c <= 6; c++) {
+          for (let c = 1; c <= nT; c++) {
             const cell = tr.getCell(c);
             cell.fill = xlGloss(GLOSS_SOFT);
             cell.font = xlFont(10, true, XL.ink);
             cell.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlGoldEdge, left: xlGoldEdge, right: xlGoldEdge };
-            if (c >= 2 && c <= 5) {
-              const cd = totals[c - 2];
+            if (c >= 2 && c <= colLast) {
+              const cd = built.total[c - 2];
               cell.value = cd.v;
               if (cd.fmt) cell.numFmt = cd.fmt;
-              cell.alignment = { vertical: 'middle', horizontal: cd.center ? 'center' : cd.right ? 'right' : 'left', indent: cd.center ? 0 : 1 };
+              cell.alignment = align(cd.a || 'l');
             }
           }
-          ws.addConditionalFormatting({ ref: 'C' + r0 + ':C' + rl, rules: [{ type: 'dataBar', priority: 1, gradient: true,
+          if (barCol) ws.addConditionalFormatting({ ref: barCol + r0 + ':' + barCol + rl, rules: [{ type: 'dataBar', priority: 1, gradient: true,
             cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: 'FFE9CF85' } }] });
-          xlFrame(ws, 1, startRow, 6, rl + 1, !!imgs, !!imgs);
-          xlShadow(ws, 1, startRow, 6, rl + 1);
-          xlRound(ws, imgs, 1, startRow, 6, rl + 1, true, true);
+          xlFrame(ws, 1, startRow, nT, rl + 1, !!imgs, !!imgs);
+          xlShadow(ws, 1, startRow, nT, rl + 1);
+          xlRound(ws, imgs, 1, startRow, nT, rl + 1, true, true);
           return rl + 5;
         }
-        const countBy = kind => {
-          const m = {};
-          L.rows.forEach(r => { const k = r[kind] || ''; if (k) m[k] = (m[k] || 0) + 1; });
-          return Object.keys(m).sort((a, b) => m[b] - m[a]);
+        const F = (formula, result) => ({ formula, result });
+        const cnt = (pred) => L.rows.filter(pred).length;
+        const val = (pred) => sum(L.rows.filter(pred).map(amtOf));
+        const safe = (a, b) => b ? a / b : 0;
+
+        // Breakdown by a Leads-sheet column: Leads | Share | Loan amount | Avg ticket
+        const breakdown = (kind, keyR, keys, toneKind) => r0 => {
+          const rows = keys.map((k, i) => {
+            const r = r0 + i, c = cnt(x => (x[kind] || '') === k), v = val(x => (x[kind] || '') === k);
+            return [
+              { v: k, tone: toneKind ? xlToneFor(toneKind, k) : null, bold: !!toneKind },
+              { v: F('COUNTIF(' + keyR + ',B' + r + ')', c), a: 'c', bold: true },
+              { v: F('IFERROR(C' + r + '/$B$6,0)', safe(c, N)), a: 'c', fmt: '0.0%' },
+              { v: F('SUMIF(' + keyR + ',B' + r + ',' + loanR + ')', v), a: 'r', fmt: XL_INR },
+              { v: F('IFERROR(E' + r + '/C' + r + ',0)', safe(v, c)), a: 'r', fmt: XL_INR }
+            ];
+          });
+          const rl = r0 + keys.length - 1, tr = rl + 1;
+          const tc = sum(keys.map(k => cnt(x => (x[kind] || '') === k))), tv = sum(keys.map(k => val(x => (x[kind] || '') === k)));
+          return { rows, total: [
+            { v: 'TOTAL' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', tc), a: 'c' }, { v: F('SUM(D' + r0 + ':D' + rl + ')', 1), a: 'c', fmt: '0.0%' },
+            { v: F('SUM(E' + r0 + ':E' + rl + ')', tv), a: 'r', fmt: XL_INR }, { v: F('IFERROR(E' + tr + '/C' + tr + ',0)', safe(tv, tc)), a: 'r', fmt: XL_INR }] };
         };
-        let next = 15;
-        next = table(next, 'Pipeline by stage', 'Stage', stageR, 'Stage', countBy('Stage'));
-        next = table(next, 'By loan type', 'Loan type', typeR, 'Loan Type', countBy('Loan Type'));
-        next = table(next, 'By channel', 'Channel', chanR, 'Channel', countBy('Channel'));
+        const H5 = (first, mid) => [first, 'Leads', mid, 'Loan amount', 'Avg ticket'];
+        next = dtable(next, 'Pipeline by stage', H5('Stage', 'Share'), breakdown('Stage', stageR, stageKeys, 'stage'), 'C');
+        next = dtable(next, 'By loan type', H5('Loan type', 'Share'), breakdown('Loan Type', typeR, typeKeys, null), 'C');
+        next = dtable(next, 'By channel', H5('Channel', 'Share'), breakdown('Channel', chanR, chanKeys, 'channel'), 'C');
+
+        // Business Associate performance: Leads | Approved | Conversion | Loan amount
+        next = dtable(next, 'Business associate performance', ['Business associate', 'Leads', 'Approved', 'Conversion', 'Loan amount'], r0 => {
+          const rows = baNames.map((k, i) => {
+            const r = r0 + i, crit = k === 'Unassigned' ? '""' : 'B' + r;
+            const inBA = x => (x['Assigned BA'] || 'Unassigned') === k;
+            const c = cnt(inBA), ap = cnt(x => inBA(x) && isApproved(x)), v = val(inBA);
+            return [
+              { v: k, bold: true },
+              { v: F('COUNTIF(' + baR + ',' + crit + ')', c), a: 'c', bold: true },
+              { v: F('COUNTIFS(' + baR + ',' + crit + ',' + stageR + ',"Approved")', ap), a: 'c' },
+              { v: F('IFERROR(D' + r + '/C' + r + ',0)', safe(ap, c)), a: 'c', fmt: '0.0%' },
+              { v: F('SUMIF(' + baR + ',' + crit + ',' + loanR + ')', v), a: 'r', fmt: XL_INR }
+            ];
+          });
+          const rl = r0 + baNames.length - 1, tr = rl + 1;
+          const tc = sum(baNames.map(k => cnt(x => (x['Assigned BA'] || 'Unassigned') === k)));
+          const ta = sum(baNames.map(k => cnt(x => (x['Assigned BA'] || 'Unassigned') === k && isApproved(x))));
+          const tv = sum(baNames.map(k => val(x => (x['Assigned BA'] || 'Unassigned') === k)));
+          return { rows, total: [
+            { v: 'TOTAL' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', tc), a: 'c' }, { v: F('SUM(D' + r0 + ':D' + rl + ')', ta), a: 'c' },
+            { v: F('IFERROR(D' + tr + '/C' + tr + ',0)', safe(ta, tc)), a: 'c', fmt: '0.0%' }, { v: F('SUM(F' + r0 + ':F' + rl + ')', tv), a: 'r', fmt: XL_INR }] };
+        }, 'C');
+
+        // Monthly trend (last 6 months): Leads | Approved | Conversion | Loan amount
+        const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        next = dtable(next, 'Monthly trend (last 6 months)', ['Month', 'Leads', 'Approved', 'Conversion', 'Loan amount'], r0 => {
+          const rows = months.map((mo, i) => {
+            const r = r0 + i, lo = 'DATE(' + mo.y + ',' + mo.m + ',1)', hi = 'DATE(' + mo.y + ',' + (mo.m + 1) + ',1)';
+            const dateCrit = createdR + ',">="&' + lo + ',' + createdR + ',"<"&' + hi;
+            const c = cnt(x => inMonth(x, mo)), ap = cnt(x => inMonth(x, mo) && isApproved(x)), v = val(x => inMonth(x, mo));
+            return [
+              { v: monthName[mo.m - 1] + ' ' + mo.y, bold: true },
+              { v: F('COUNTIFS(' + dateCrit + ')', c), a: 'c', bold: true },
+              { v: F('COUNTIFS(' + dateCrit + ',' + stageR + ',"Approved")', ap), a: 'c' },
+              { v: F('IFERROR(D' + r + '/C' + r + ',0)', safe(ap, c)), a: 'c', fmt: '0.0%' },
+              { v: F('SUMIFS(' + loanR + ',' + dateCrit + ')', v), a: 'r', fmt: XL_INR }
+            ];
+          });
+          const rl = r0 + months.length - 1, tr = rl + 1;
+          const tc = sum(months.map(mo => cnt(x => inMonth(x, mo)))), ta = sum(months.map(mo => cnt(x => inMonth(x, mo) && isApproved(x))));
+          const tv = sum(months.map(mo => val(x => inMonth(x, mo))));
+          return { rows, total: [
+            { v: 'TOTAL' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', tc), a: 'c' }, { v: F('SUM(D' + r0 + ':D' + rl + ')', ta), a: 'c' },
+            { v: F('IFERROR(D' + tr + '/C' + tr + ',0)', safe(ta, tc)), a: 'c', fmt: '0.0%' }, { v: F('SUM(F' + r0 + ':F' + rl + ')', tv), a: 'r', fmt: XL_INR }] };
+        }, 'C');
+
+        // Team workload (from Team & Status): Assigned | Pending | Submitted | Completion
+        if (T && T.rows.length) {
+          const tcol = h => rng(T, h);
+          const depts = [['Legal', 'Assigned Legal', 'Legal Status', 'Legal Submitted'], ['Technical', 'Assigned Technical', 'Technical Status', 'Technical Submitted'], ['Credit', 'Assigned Credit', 'Credit Status', 'Credit Submitted']];
+          next = dtable(next, 'Team workload', ['Department', 'Assigned', 'Pending', 'Submitted', 'Completion'], r0 => {
+            const rows = depts.map((d, i) => {
+              const r = r0 + i, asg = T.rows.filter(x => x[d[1]]).length;
+              const pend = T.rows.filter(x => x[d[1]] && String(x[d[2]]).toLowerCase() === 'pending').length;
+              const sub = T.rows.filter(x => x[d[3]] === 'Yes').length;
+              return [
+                { v: d[0], bold: true },
+                { v: F('COUNTIF(' + tcol(d[1]) + ',"?*")', asg), a: 'c', bold: true },
+                { v: F('COUNTIFS(' + tcol(d[1]) + ',"?*",' + tcol(d[2]) + ',"pending")', pend), a: 'c' },
+                { v: F('COUNTIF(' + tcol(d[3]) + ',"Yes")', sub), a: 'c' },
+                { v: F('IFERROR(E' + r + '/C' + r + ',0)', safe(sub, asg)), a: 'c', fmt: '0.0%' }
+              ];
+            });
+            const rl = r0 + depts.length - 1, tr = rl + 1;
+            const sA = sum(depts.map(d => T.rows.filter(x => x[d[1]]).length));
+            const sP = sum(depts.map(d => T.rows.filter(x => x[d[1]] && String(x[d[2]]).toLowerCase() === 'pending').length));
+            const sS = sum(depts.map(d => T.rows.filter(x => x[d[3]] === 'Yes').length));
+            return { rows, total: [
+              { v: 'TOTAL' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', sA), a: 'c' }, { v: F('SUM(D' + r0 + ':D' + rl + ')', sP), a: 'c' },
+              { v: F('SUM(E' + r0 + ':E' + rl + ')', sS), a: 'c' }, { v: F('IFERROR(E' + tr + '/C' + tr + ',0)', safe(sS, sA)), a: 'c', fmt: '0.0%' }] };
+          }, 'C');
+        }
+
+        // Lead ageing of open leads: Open leads | Share | Loan amount | Avg ticket
+        const dayMs = 86400000;
+        const ageOf = r => r['Created'] ? Math.floor((today - r['Created']) / dayMs) : 0;
+        const buckets = [
+          ['0 – 7 days', x => ageOf(x) <= 7, 'B2>=TODAY()-7', null, 'TODAY()-7'],
+          ['8 – 30 days', x => ageOf(x) > 7 && ageOf(x) <= 30, null, 'TODAY()-7', 'TODAY()-30'],
+          ['31 – 90 days', x => ageOf(x) > 30 && ageOf(x) <= 90, null, 'TODAY()-30', 'TODAY()-90'],
+          ['Over 90 days', x => ageOf(x) > 90, null, 'TODAY()-90', null]
+        ];
+        const openCrit = ',' + stageR + ',"<>Approved",' + stageR + ',"<>*Declined*"';
+        next = dtable(next, 'Lead ageing (open leads)', ['Age', 'Open leads', 'Share', 'Loan amount', 'Avg ticket'], r0 => {
+          const rl = r0 + buckets.length - 1, tr = rl + 1;
+          const rows = buckets.map((b, i) => {
+            const r = r0 + i;
+            const dc = (b[4] && b[3]) ? createdR + ',">="&' + b[4] + ',' + createdR + ',"<"&' + b[3]
+              : b[3] === null ? createdR + ',">="&' + b[4]
+              : createdR + ',"<"&' + b[3];
+            const sel = x => b[1](x) && !isApproved(x) && !isDeclined(x);
+            const c = cnt(sel), v = val(sel);
+            return [
+              { v: b[0], bold: true },
+              { v: F('COUNTIFS(' + dc + openCrit + ')', c), a: 'c', bold: true },
+              { v: F('IFERROR(C' + r + '/SUM($C$' + r0 + ':$C$' + rl + '),0)', safe(c, openRows.length)), a: 'c', fmt: '0.0%' },
+              { v: F('SUMIFS(' + loanR + ',' + dc + openCrit + ')', v), a: 'r', fmt: XL_INR },
+              { v: F('IFERROR(E' + r + '/C' + r + ',0)', safe(v, c)), a: 'r', fmt: XL_INR }
+            ];
+          });
+          const tc = sum(buckets.map(b => cnt(x => b[1](x) && !isApproved(x) && !isDeclined(x))));
+          const tv = sum(buckets.map(b => val(x => b[1](x) && !isApproved(x) && !isDeclined(x))));
+          return { rows, total: [
+            { v: 'TOTAL OPEN' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', tc), a: 'c' }, { v: F('SUM(D' + r0 + ':D' + rl + ')', 1), a: 'c', fmt: '0.0%' },
+            { v: F('SUM(E' + r0 + ':E' + rl + ')', tv), a: 'r', fmt: XL_INR }, { v: F('IFERROR(E' + tr + '/C' + tr + ',0)', safe(tv, tc)), a: 'r', fmt: XL_INR }] };
+        }, 'C');
+        return ws;
+      }
+
+      // Notes sheet: what is in the file, how the numbers are worked out, colour legend
+      function aboutSheet(wb, sheets, stamp, imgs, ctx) {
+        const nT = 4;
+        const ws = wb.addWorksheet('About', {
+          properties: { tabColor: { argb: 'FF8A8A9A' } },
+          views: [{ showGridLines: false }],
+          pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+        });
+        ws.columns = [{ width: XL_EDGE }, { width: 30 }, { width: 70 }, { width: XL_EDGE }];
+        xlBanner(ws, nT, 'About this report', stamp);
+        ws.getRow(4).height = 10;
+        xlFrame(ws, 1, 1, nT, 2, !!imgs, false);
+        xlRound(ws, imgs, 1, 1, nT, 2, true, false);
+        let r = 5;
+        const section = (title, rows, toneCol) => {
+          ws.mergeCells(r, 2, r, 3);
+          [1, nT].forEach(c => { ws.getCell(r, c).fill = xlGloss(GLOSS_INK); });
+          const bar = ws.getCell(r, 2);
+          bar.value = title.toUpperCase();
+          bar.font = xlFont(11, true, XL.gold);
+          bar.fill = xlGloss(GLOSS_INK);
+          bar.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+          ws.getRow(r).height = 26;
+          const start = r;
+          rows.forEach((row, i) => {
+            const rr = ws.getRow(r + 1 + i);
+            rr.height = Math.max(20, Math.max(Math.ceil(String(row[1]).length / 72), Math.ceil(String(row[0]).length / 30)) * 15 + 6);
+            const zebra = i % 2 === 0 ? XL.white : XL.cream;
+            [1, nT].forEach(ec => { const e = rr.getCell(ec); e.fill = xlFill(zebra); e.border = xlBorder; });
+            const a = rr.getCell(2), b = rr.getCell(3);
+            a.value = row[0]; b.value = row[1];
+            [a, b].forEach(c => { c.border = xlBorder; c.fill = xlFill(zebra); c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true }; c.font = xlFont(10, false, XL.text); });
+            a.font = xlFont(10, true, XL.ink);
+            if (row[2] && XL_TONES[row[2]]) { a.fill = xlFill(XL_TONES[row[2]].fill); a.font = xlFont(10, true, XL_TONES[row[2]].font); }
+          });
+          const end = r + rows.length;
+          xlFrame(ws, 1, start, nT, end, !!imgs, !!imgs);
+          xlRound(ws, imgs, 1, start, nT, end, true, true);
+          r = end + 3;
+        };
+        const total = sheets.find(s => s.name === 'Leads');
+        section('Report details', [
+          ['Report', 'Solitaire Finz Mart – lead portfolio'],
+          ['Generated', stamp.replace(/^Generated\s*/, '')],
+          ['Leads included', String(total ? total.rows.length : 0) + (ctx && ctx.scope ? '   (' + ctx.scope + ')' : '')],
+          ['Currency', 'Indian rupees (₹), shown in lakh / crore grouping']
+        ]);
+        section('Sheets in this file', [
+          ['Dashboard', 'KPI panels, charts, stage / loan type / channel mix, associate performance, monthly trend, team workload, lead ageing'],
+          ['Leads', 'One row per lead: stage, loan type and amount, channel, institution, credit band, assigned associate'],
+          ['Applicant', 'Borrower profile: employment, income, debt, CIBIL, profile type, retirement details'],
+          ['Co-applicants', 'One row per co-applicant with income, debt and CIBIL'],
+          ['Property & Loan', 'Property type and value, balance-transfer and top-up amounts, current bank'],
+          ['Team & Status', 'Who is handling each lead in Legal, Technical and Credit, with status and submitted flags'],
+          ['References', 'One row per reference given by the customer']
+        ]);
+        section('How numbers are worked out', [
+          ['Conversion rate', 'Approved leads ÷ total leads'],
+          ['Pipeline value', 'Loan amount of leads that are neither Approved nor Declined'],
+          ['Average ticket', 'Total loan amount ÷ number of leads'],
+          ['Lead ageing', 'Days since the lead was created, for open leads only (updates each day the file is opened)'],
+          ['Team completion', 'Submitted ÷ assigned, per department'],
+          ['Totals rows', 'Use SUBTOTAL, so they follow any filter you apply on the header row']
+        ]);
+        section('Colour legend', [
+          ['Approved / Excellent / Yes', 'Good outcome', 'green'],
+          ['Contacted / Legal stages / Good / Bank', 'In process or healthy', 'blue'],
+          ['Document collection / Fair / Pending', 'Needs attention', 'amber'],
+          ['Technical stages / NBFC', 'Technical review or NBFC channel', 'copper'],
+          ['Underwriting', 'With the credit desk', 'purple'],
+          ['Declined / Rejected / Poor', 'Negative outcome', 'red'],
+          ['New / No', 'Not started', 'grey']
+        ]);
         return ws;
       }
 
@@ -8176,6 +8530,7 @@
         const hasLeads = sheets.some(s => s.name === 'Leads' && s.rows.length);
         if (ctx.dashboard && hasLeads) dashboardSheet(wb, sheets, ctx.stamp, imgs);
         sheets.forEach(sp => { if (sp.rows.length) styledSheet(wb, sp, ctx.stamp, imgs); });
+        if (ctx.dashboard && hasLeads) aboutSheet(wb, sheets, ctx.stamp, imgs, ctx);
         return wb.xlsx.writeBuffer();
       }
 
@@ -8183,9 +8538,12 @@
       async function buildAndSave(sheets, baseName, doneText, opts) {
         const st = document.getElementById('exportStatus');
         const stamp = 'Generated ' + fmtUtcDate(xlsxDate(new Date())) + ' by ' + ((currentUserData && currentUserData.name) || currentUser || 'user');
+        const scopeMap = { business: 'Business Associate: own leads only', legal: 'Legal: assigned leads only', technical: 'Technical: assigned leads only',
+          credit: 'Credit: assigned leads only', customer: 'Customer: own leads only' };
+        const scope = scopeMap[currentRole] || 'All leads';
         if (typeof ExcelJS !== 'undefined') {
           try {
-            const bytes = await buildStyledWorkbook(sheets, { stamp, dashboard: !!(opts && opts.dashboard) });
+            const bytes = await buildStyledWorkbook(sheets, { stamp, scope, dashboard: !!(opts && opts.dashboard) });
             return saveBytes(bytes, baseName, st, doneText);
           } catch (e) { console.error('Styled export failed, falling back to plain sheets', e); }
         }
