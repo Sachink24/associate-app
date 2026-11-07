@@ -7725,7 +7725,7 @@
         setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000);
       }
       // ---- Professional spreadsheet styling (ExcelJS) --------------------------------------
-      const XL = { ink: 'FF14141E', gold: 'FFC9A84C', goldDeep: 'FFA8832F', goldSoft: 'FFF3E9C6', cream: 'FFFBF8EF', white: 'FFFFFFFF', line: 'FFE3D9B8', text: 'FF23232F', muted: 'FF7A7260' };
+      const XL = { ink: 'FF14141E', gold: 'FFC9A84C', goldDeep: 'FFA8832F', goldSoft: 'FFF3E9C6', cream: 'FFFBF8EF', white: 'FFFFFFFF', line: 'FFE3D9B8', text: 'FF23232F', muted: 'FF7A7260', shadow: 'FFD9D3C0', shadow2: 'FFEBE7DA' };
       const XL_INR = '[>=10000000]"₹"##\\,##\\,##\\,##0;[>=100000]"₹"##\\,##\\,##0;"₹"##,##0';
       const XL_TONES = {
         green: { fill: 'FFD7F0E1', font: 'FF1E7A4D' }, red: { fill: 'FFF8D7D7', font: 'FFA13A3A' },
@@ -7758,7 +7758,17 @@
         return null;
       }
       const xlFill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+      // Glossy fill: light top half, slightly deeper bottom half with a crisp "glass" split
+      const xlGloss = c => ({ type: 'gradient', gradient: 'angle', degree: 90, stops: [
+        { position: 0, color: { argb: c[0] } }, { position: 0.499, color: { argb: c[1] } },
+        { position: 0.5, color: { argb: c[2] } }, { position: 1, color: { argb: c[3] } }] });
+      const GLOSS_INK = ['FF272738', 'FF1B1B28', 'FF12121B', 'FF0A0A10'];
+      const GLOSS_GOLD = ['FFF3DD9B', 'FFDEBF68', 'FFC9A84C', 'FFB08A2E'];
+      const GLOSS_SOFT = ['FFFCF6E0', 'FFF6ECCB', 'FFEFE3B8', 'FFE7D8A3'];
+      const GLOSS_CREAM = ['FFFFFFFF', 'FFFDFBF4', 'FFFBF8EF', 'FFF3EEDC'];
       const xlThin = { style: 'thin', color: { argb: XL.line } };
+      const xlGoldEdge = { style: 'thin', color: { argb: XL.goldDeep } };
+      const xlFrameEdge = { style: 'medium', color: { argb: XL.goldDeep } };
       const xlBorder = { top: xlThin, left: xlThin, bottom: xlThin, right: xlThin };
       const xlFont = (size, bold, argb, italic) => ({ name: 'Calibri', size, bold: !!bold, italic: !!italic, color: { argb } });
       function xlsxDate(d) {
@@ -7774,53 +7784,154 @@
         while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
         return s;
       }
-      function xlBanner(ws, n, title, stamp) {
-        ws.mergeCells(1, 1, 1, n);
-        ws.mergeCells(2, 1, 2, n);
-        const t = ws.getCell(1, 1);
-        t.value = 'SOLITAIRE FINZ MART  ·  ' + title.toUpperCase();
-        t.font = xlFont(16, true, XL.gold);
-        t.fill = xlFill(XL.ink);
-        t.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-        const s = ws.getCell(2, 1);
-        s.value = stamp;
-        s.font = xlFont(10, false, XL.goldSoft, true);
-        s.fill = xlFill(XL.ink);
-        s.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-        ws.getRow(1).height = 32;
-        ws.getRow(2).height = 18;
-        ws.getRow(3).height = 4;
-        for (let i = 1; i <= n; i++) ws.getCell(3, i).fill = xlFill(XL.gold);
+
+      // ---- Rounded corners: small corner images drawn over the square cell corners ----
+      // Each image is as tall as the corner row, so it also draws the straight gold edge of that row.
+      const XL_R = 9;
+      const XL_EDGE = 1.4; // thin edge columns keep the corner images exactly on the corners
+      function xlCornerFactory(wb) {
+        try {
+          if (typeof document === 'undefined') return null;
+          document.createElement('canvas').getContext('2d');
+        } catch (e) { return null; }
+        const cache = {};
+        return function (kind, H) {
+          const R = XL_R, HH = Math.max(R, Math.round(H)), key = kind + HH;
+          if (cache[key] !== undefined) return cache[key];
+          let id = null;
+          try {
+            const isTop = kind[0] === 't', isLeft = kind[1] === 'l';
+            const cv = document.createElement('canvas');
+            cv.width = R; cv.height = HH;
+            const g = cv.getContext('2d');
+            const sqY = isTop ? 0 : HH - R;
+            const cx = isLeft ? R : 0, cy = sqY + (isTop ? R : 0);
+            g.fillStyle = kind === 'br' ? '#D9D3C0' : '#FFFFFF'; // bottom-right sits against the shadow strip
+            g.fillRect(0, sqY, R, R);
+            g.globalCompositeOperation = 'destination-out';
+            g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+            g.globalCompositeOperation = 'source-over';
+            g.save();
+            g.beginPath(); g.rect(0, sqY, R, R); g.clip();
+            g.strokeStyle = '#A8832F'; g.lineWidth = 1.8;
+            g.beginPath(); g.arc(cx, cy, R - 0.7, 0, Math.PI * 2); g.stroke();
+            g.restore();
+            g.fillStyle = '#A8832F';
+            const y0 = isTop ? R : 0, y1 = isTop ? HH : HH - R;
+            if (y1 > y0) g.fillRect(isLeft ? 0 : R - 2, y0, 2, y1 - y0);
+            id = wb.addImage({ base64: cv.toDataURL('image/png'), extension: 'png' });
+          } catch (e) { id = null; }
+          cache[key] = id;
+          return id;
+        };
+      }
+      const xlColPx = (ws, c) => Math.max(10, (ws.getColumn(c).width || 9) * 7);
+      const xlRowPx = (ws, r) => Math.max(10, (ws.getRow(r).height || 15) * 96 / 72);
+      // Round the four corners of the block c1..c2 x r1..r2 (1-based cells). top/bottom switch each pair on or off.
+      function xlRound(ws, imgs, c1, r1, c2, r2, top, bottom) {
+        if (!imgs) return;
+        const R = XL_R, EMU = 9525;
+        const put = (kind, nc, ncOff, nr, H) => {
+          const id = imgs(kind, H);
+          if (id === null || id === undefined) return;
+          ws.addImage(id, {
+            tl: { nativeCol: nc, nativeColOff: Math.round(ncOff), nativeRow: nr, nativeRowOff: 0 },
+            ext: { width: R, height: Math.max(R, Math.round(H)) }, editAs: 'oneCell'
+          });
+        };
+        const rightOff = (xlColPx(ws, c2) - R) * EMU;
+        if (top) { const H = xlRowPx(ws, r1); put('tl', c1 - 1, 0, r1 - 1, H); put('tr', c2 - 1, rightOff, r1 - 1, H); }
+        if (bottom) { const H = xlRowPx(ws, r2); put('bl', c1 - 1, 0, r2 - 1, H); put('br', c2 - 1, rightOff, r2 - 1, H); }
+      }
+      // Soft drop shadow: a grey strip down the right edge and along the bottom edge of a block
+      function xlShadow(ws, c1, r1, c2, r2) {
+        const sc = c2 + 1;
+        ws.getColumn(sc).width = 1.3;
+        for (let r = r1 + 1; r <= r2 + 1; r++) ws.getCell(r, sc).fill = xlFill(XL.shadow);
+        const sr = r2 + 1, sr2 = r2 + 2;
+        ws.getRow(sr).height = 5; ws.getRow(sr2).height = 3;
+        for (let c = c1 + 1; c <= sc; c++) {
+          ws.getCell(sr, c).fill = xlFill(XL.shadow);
+          ws.getCell(sr2, c).fill = xlFill(XL.shadow2);
+        }
+        ws.getCell(sr2, sc).fill = xlFill(XL.shadow2);
+      }
+      // Matching medium gold frame around the block. When corners are rounded, the corner cells skip their
+      // outer edges (the corner image draws the curved edge instead).
+      function xlFrame(ws, c1, r1, c2, r2, rTop, rBottom) {
+        for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
+          if (r !== r1 && r !== r2 && c !== c1 && c !== c2) continue;
+          const cell = ws.getCell(r, c), b = Object.assign({}, cell.border || {});
+          if (r === r1) b.top = xlFrameEdge;
+          if (r === r2) b.bottom = xlFrameEdge;
+          if (c === c1) b.left = xlFrameEdge;
+          if (c === c2) b.right = xlFrameEdge;
+          const cornerTop = rTop && r === r1 && (c === c1 || c === c2);
+          const cornerBottom = rBottom && r === r2 && (c === c1 || c === c2);
+          if (cornerTop || cornerBottom) {
+            if (c === c1) delete b.left;
+            if (c === c2) delete b.right;
+            if (cornerTop) b.top = { style: 'thin', color: { argb: XL.white } };
+            if (cornerBottom) b.bottom = { style: 'thin', color: { argb: XL.white } };
+          }
+          cell.border = b;
+        }
       }
 
-      // One data sheet: title banner, gold header, striped rows, colour-coded cells, totals, filter, frozen header
-      function styledSheet(wb, sp, stamp) {
-        const n = sp.cols.length, N = sp.rows.length;
+      function xlBanner(ws, nTotal, title, stamp) {
+        // The two edge columns stay separate so the rounded corners and frame can sit exactly on them
+        ws.mergeCells(1, 2, 1, nTotal - 1);
+        ws.mergeCells(2, 2, 2, nTotal - 1);
+        [1, nTotal].forEach(c => { ws.getCell(1, c).fill = xlGloss(GLOSS_INK); ws.getCell(2, c).fill = xlGloss(GLOSS_INK); });
+        const t = ws.getCell(1, 2);
+        t.value = 'SOLITAIRE FINZ MART  ·  ' + title.toUpperCase();
+        t.font = xlFont(16, true, XL.gold);
+        t.fill = xlGloss(GLOSS_INK);
+        t.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        const s = ws.getCell(2, 2);
+        s.value = stamp;
+        s.font = xlFont(10, false, XL.goldSoft, true);
+        s.fill = xlGloss(GLOSS_INK);
+        s.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        ws.getRow(1).height = 34;
+        ws.getRow(2).height = 18;
+        ws.getRow(3).height = 5;
+        for (let i = 1; i <= nTotal; i++) ws.getCell(3, i).fill = xlGloss(GLOSS_GOLD);
+      }
+
+      // One data sheet: glossy banner, gold header, striped rows, colour-coded cells, totals, framed with shadow.
+      // Layout: [edge column] [data columns...] [edge column]  (data starts in column B)
+      function styledSheet(wb, sp, stamp, imgs) {
+        const n = sp.cols.length, N = sp.rows.length, nT = n + 2;
         const ws = wb.addWorksheet(sp.name, {
           properties: { tabColor: { argb: sp.tab || XL.gold } },
           views: [{ state: 'frozen', ySplit: 4, showGridLines: false }],
           pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '4:4' }
         });
-        ws.columns = sp.cols.map(c => ({ width: c.w || 16 }));
-        xlBanner(ws, n, sp.title, stamp + '  ·  ' + N + ' record' + (N === 1 ? '' : 's'));
+        ws.columns = [{ width: XL_EDGE }].concat(sp.cols.map(c => ({ width: c.w || 16 })), [{ width: XL_EDGE }]);
+        xlBanner(ws, nT, sp.title, stamp + '  ·  ' + N + ' record' + (N === 1 ? '' : 's'));
 
         const hr = ws.getRow(4);
-        hr.height = 28;
-        sp.cols.forEach((c, j) => {
-          const cell = hr.getCell(j + 1);
-          cell.value = c.h;
-          cell.font = xlFont(10, true, XL.ink);
-          cell.fill = xlFill(XL.gold);
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-          cell.border = { top: xlThin, left: xlThin, right: xlThin, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
-        });
+        hr.height = 30;
+        for (let c = 1; c <= nT; c++) {
+          const cell = hr.getCell(c);
+          const isData = c > 1 && c < nT;
+          if (isData) {
+            cell.value = sp.cols[c - 2].h;
+            cell.font = xlFont(10, true, XL.ink);
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          }
+          cell.fill = xlGloss(GLOSS_GOLD);
+          cell.border = { top: xlGoldEdge, left: xlGoldEdge, right: xlGoldEdge, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
+        }
 
         sp.rows.forEach((row, i) => {
           const r = ws.getRow(5 + i);
           r.height = 20;
           const zebra = i % 2 === 0 ? XL.white : XL.cream;
+          [1, nT].forEach(ec => { const e = r.getCell(ec); e.fill = xlFill(zebra); e.border = xlBorder; });
           sp.cols.forEach((c, j) => {
-            const cell = r.getCell(j + 1);
+            const cell = r.getCell(j + 2);
             const t = c.t || 'text';
             let v = row[c.h];
             cell.border = xlBorder;
@@ -7854,7 +7965,7 @@
 
         const first = 5, last = 4 + N;
         sp.cols.forEach((c, j) => {
-          const L = colLetter(j + 1), ref = L + first + ':' + L + last;
+          const L = colLetter(j + 2), ref = L + first + ':' + L + last;
           if (c.t === 'score') {
             ws.addConditionalFormatting({ ref, rules: [{ type: 'colorScale', priority: 1,
               cfvo: [{ type: 'num', value: 300 }, { type: 'num', value: 700 }, { type: 'num', value: 900 }],
@@ -7866,34 +7977,42 @@
           }
         });
 
+        let endRow = last;
         if (sp.totals && sp.totals.length) {
-          const tr = ws.getRow(last + 1);
-          tr.height = 24;
-          sp.cols.forEach((c, j) => {
-            const cell = tr.getCell(j + 1);
-            cell.fill = xlFill(XL.goldSoft);
+          endRow = last + 1;
+          const tr = ws.getRow(endRow);
+          tr.height = 26;
+          for (let c = 1; c <= nT; c++) {
+            const cell = tr.getCell(c);
+            cell.fill = xlGloss(GLOSS_SOFT);
             cell.font = xlFont(10, true, XL.ink);
-            cell.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlThin, left: xlThin, right: xlThin };
-            cell.alignment = { vertical: 'middle', horizontal: c.t === 'inr' ? 'right' : 'left', indent: 1 };
-            if (j === 0) cell.value = 'TOTAL';
-            if (sp.totals.includes(c.h)) {
-              const L = colLetter(j + 1);
-              const sum = sp.rows.reduce((a, rr) => a + (Number(rr[c.h]) || 0), 0);
+            cell.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlGoldEdge, left: xlGoldEdge, right: xlGoldEdge };
+            if (c === 1 || c === nT) continue;
+            const col = sp.cols[c - 2];
+            cell.alignment = { vertical: 'middle', horizontal: col.t === 'inr' ? 'right' : 'left', indent: 1 };
+            if (c === 2) cell.value = 'TOTAL';
+            if (sp.totals.includes(col.h)) {
+              const L = colLetter(c);
+              const sum = sp.rows.reduce((a, rr) => a + (Number(rr[col.h]) || 0), 0);
               cell.value = { formula: 'SUBTOTAL(109,' + L + first + ':' + L + last + ')', result: sum };
               cell.numFmt = XL_INR;
             }
-          });
+          }
         }
-        ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: last, column: n } };
+        ws.autoFilter = { from: { row: 4, column: 2 }, to: { row: last, column: n + 1 } };
+        xlFrame(ws, 1, 1, nT, endRow, !!imgs, !!imgs);
+        xlShadow(ws, 1, 1, nT, endRow);
+        xlRound(ws, imgs, 1, 1, nT, endRow, true, true);
         return ws;
       }
 
-      // Summary page with KPI tiles and breakdown tables (live formulas that point at the Leads sheet)
-      function dashboardSheet(wb, sheets, stamp) {
+      // Summary page with glossy KPI panels and breakdown tables (live formulas that point at the Leads sheet)
+      // Layout: [edge] [4 content columns B..E] [edge] [shadow]
+      function dashboardSheet(wb, sheets, stamp, imgs) {
         const L = sheets.find(s => s.name === 'Leads');
         const A = sheets.find(s => s.name === 'Applicant');
         const N = L.rows.length;
-        const colOf = (spec, h) => colLetter(spec.cols.findIndex(c => c.h === h) + 1);
+        const colOf = (spec, h) => colLetter(spec.cols.findIndex(c => c.h === h) + 2);
         const rng = (spec, h) => "'" + spec.name + "'!$" + colOf(spec, h) + '$5:$' + colOf(spec, h) + '$' + (4 + spec.rows.length);
         const stageR = rng(L, 'Stage'), loanR = rng(L, 'Loan Amount (₹)'), idR = rng(L, 'Lead ID'),
           typeR = rng(L, 'Loan Type'), chanR = rng(L, 'Channel');
@@ -7903,9 +8022,11 @@
           views: [{ showGridLines: false }],
           pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
         });
-        ws.columns = [{ width: 27 }, { width: 27 }, { width: 27 }, { width: 27 }];
-        xlBanner(ws, 4, 'Portfolio Dashboard', stamp + '  ·  ' + N + ' lead' + (N === 1 ? '' : 's'));
-        ws.getRow(4).height = 8;
+        ws.columns = [{ width: XL_EDGE }, { width: 27 }, { width: 27 }, { width: 27 }, { width: 27 }, { width: XL_EDGE }, { width: 1.3 }];
+        xlBanner(ws, 6, 'Portfolio Dashboard', stamp + '  ·  ' + N + ' lead' + (N === 1 ? '' : 's'));
+        ws.getRow(4).height = 10;
+        xlFrame(ws, 1, 1, 6, 2, !!imgs, false);
+        xlRound(ws, imgs, 1, 1, 6, 2, true, false);
 
         const sum = a => a.reduce((x, y) => x + y, 0);
         const loans = L.rows.map(r => Number(r['Loan Amount (₹)']) || 0);
@@ -7913,68 +8034,93 @@
         const approved = stages.filter(s => s === 'Approved').length;
         const declined = stages.filter(s => String(s).includes('Declined')).length;
         const scores = A ? A.rows.map(r => Number(r['CIBIL Score'])).filter(x => x >= 300 && x <= 900) : [];
-        const white = { style: 'thick', color: { argb: XL.white } };
+        const gap = { style: 'thick', color: { argb: XL.white } };
 
         function tile(r, c, label, value, fmt, formula) {
           const lc = ws.getCell(r, c);
           lc.value = label.toUpperCase();
           lc.font = xlFont(9, true, XL.gold);
-          lc.fill = xlFill(XL.ink);
+          lc.fill = xlGloss(GLOSS_INK);
           lc.alignment = { vertical: 'middle', horizontal: 'center' };
-          lc.border = { left: white, right: white };
+          lc.border = { left: c === 2 ? undefined : gap, right: c === 5 ? undefined : gap };
           const vc = ws.getCell(r + 1, c);
           vc.value = formula ? { formula, result: value } : value;
           if (fmt) vc.numFmt = fmt;
           vc.font = xlFont(18, true, XL.ink);
-          vc.fill = xlFill(XL.cream);
+          vc.fill = xlGloss(GLOSS_CREAM);
           vc.alignment = { vertical: 'middle', horizontal: 'center' };
-          vc.border = { left: white, right: white, bottom: { style: 'medium', color: { argb: XL.gold } } };
+          vc.border = { left: c === 2 ? undefined : gap, right: c === 5 ? undefined : gap };
         }
-        ws.getRow(5).height = 20; ws.getRow(6).height = 40; ws.getRow(7).height = 8;
-        ws.getRow(8).height = 20; ws.getRow(9).height = 40; ws.getRow(10).height = 12;
-        tile(5, 1, 'Total leads', N, '0', 'COUNTA(' + idR + ')');
-        tile(5, 2, 'Total loan amount', sum(loans), XL_INR, 'SUM(' + loanR + ')');
-        tile(5, 3, 'Average ticket', N ? sum(loans) / N : 0, XL_INR, 'IFERROR(AVERAGE(' + loanR + '),0)');
-        tile(5, 4, 'Conversion rate', N ? approved / N : 0, '0.0%', 'IFERROR(COUNTIF(' + stageR + ',"Approved")/COUNTA(' + idR + '),0)');
-        tile(8, 1, 'Approved', approved, '0', 'COUNTIF(' + stageR + ',"Approved")');
-        tile(8, 2, 'Declined', declined, '0', 'COUNTIF(' + stageR + ',"*Declined*")');
-        tile(8, 3, 'In progress', N - approved - declined, '0', 'A6-A9-B9');
-        tile(8, 4, 'Average CIBIL', scores.length ? Math.round(sum(scores) / scores.length) : 0, '0',
-          A ? 'IFERROR(ROUND(AVERAGE(' + rng(A, 'CIBIL Score') + '),0),0)' : null);
+        function tileRow(r, tiles) {
+          ws.getRow(r).height = 22;
+          ws.getRow(r + 1).height = 42;
+          [1, 6].forEach(c => {
+            ws.getCell(r, c).fill = xlGloss(GLOSS_INK);
+            ws.getCell(r + 1, c).fill = xlGloss(GLOSS_CREAM);
+          });
+          tiles.forEach((t, i) => tile(r, i + 2, t[0], t[1], t[2], t[3]));
+          for (let c = 1; c <= 6; c++) {
+            const b = ws.getCell(r + 1, c);
+            b.border = Object.assign({}, b.border, { bottom: xlFrameEdge });
+          }
+          xlFrame(ws, 1, r, 6, r + 1, !!imgs, !!imgs);
+          xlShadow(ws, 1, r, 6, r + 1);
+          xlRound(ws, imgs, 1, r, 6, r + 1, true, true);
+        }
+        tileRow(5, [
+          ['Total leads', N, '0', 'COUNTA(' + idR + ')'],
+          ['Total loan amount', sum(loans), XL_INR, 'SUM(' + loanR + ')'],
+          ['Average ticket', N ? sum(loans) / N : 0, XL_INR, 'IFERROR(AVERAGE(' + loanR + '),0)'],
+          ['Conversion rate', N ? approved / N : 0, '0.0%', 'IFERROR(COUNTIF(' + stageR + ',"Approved")/COUNTA(' + idR + '),0)']
+        ]);
+        ws.getRow(9).height = 8;
+        tileRow(10, [
+          ['Approved', approved, '0', 'COUNTIF(' + stageR + ',"Approved")'],
+          ['Declined', declined, '0', 'COUNTIF(' + stageR + ',"*Declined*")'],
+          ['In progress', N - approved - declined, '0', 'B6-B11-C11'],
+          ['Average CIBIL', scores.length ? Math.round(sum(scores) / scores.length) : 0, '0',
+            A ? 'IFERROR(ROUND(AVERAGE(' + rng(A, 'CIBIL Score') + '),0),0)' : null]
+        ]);
+        ws.getRow(14).height = 8;
 
         function table(startRow, title, headLabel, keyR, kind, keys) {
-          ws.mergeCells(startRow, 1, startRow, 4);
-          const bar = ws.getCell(startRow, 1);
+          ws.mergeCells(startRow, 2, startRow, 5);
+          [1, 6].forEach(c => { ws.getCell(startRow, c).fill = xlGloss(GLOSS_INK); });
+          const bar = ws.getCell(startRow, 2);
           bar.value = title.toUpperCase();
           bar.font = xlFont(11, true, XL.gold);
-          bar.fill = xlFill(XL.ink);
+          bar.fill = xlGloss(GLOSS_INK);
           bar.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-          ws.getRow(startRow).height = 24;
+          ws.getRow(startRow).height = 26;
           const hr = ws.getRow(startRow + 1);
-          hr.height = 22;
-          [headLabel, 'Leads', 'Share', 'Loan amount'].forEach((h, j) => {
-            const c = hr.getCell(j + 1);
-            c.value = h;
-            c.font = xlFont(10, true, XL.ink);
-            c.fill = xlFill(XL.gold);
-            c.alignment = { vertical: 'middle', horizontal: j === 0 ? 'left' : 'center', indent: j === 0 ? 1 : 0 };
-            c.border = { top: xlThin, left: xlThin, right: xlThin, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
-          });
+          hr.height = 24;
+          for (let c = 1; c <= 6; c++) {
+            const cell = hr.getCell(c);
+            if (c >= 2 && c <= 5) {
+              const j = c - 2;
+              cell.value = [headLabel, 'Leads', 'Share', 'Loan amount'][j];
+              cell.font = xlFont(10, true, XL.ink);
+              cell.alignment = { vertical: 'middle', horizontal: j === 0 ? 'left' : 'center', indent: j === 0 ? 1 : 0 };
+            }
+            cell.fill = xlGloss(GLOSS_GOLD);
+            cell.border = { top: xlGoldEdge, left: xlGoldEdge, right: xlGoldEdge, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
+          }
           const r0 = startRow + 2;
           keys.forEach((k, i) => {
             const r = r0 + i;
             const row = ws.getRow(r);
-            row.height = 20;
+            row.height = 21;
             const zebra = i % 2 === 0 ? XL.white : XL.cream;
+            [1, 6].forEach(ec => { const e = row.getCell(ec); e.fill = xlFill(zebra); e.border = xlBorder; });
             const cnt = L.rows.filter(x => (x[kind] || '') === k).length;
             const amt = sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0));
             const cells = [
-              { v: k }, { v: { formula: 'COUNTIF(' + keyR + ',A' + r + ')', result: cnt }, center: true },
-              { v: { formula: 'IFERROR(B' + r + '/$A$6,0)', result: N ? cnt / N : 0 }, fmt: '0.0%', center: true },
-              { v: { formula: 'SUMIF(' + keyR + ',A' + r + ',' + loanR + ')', result: amt }, fmt: XL_INR, right: true }
+              { v: k }, { v: { formula: 'COUNTIF(' + keyR + ',B' + r + ')', result: cnt }, center: true },
+              { v: { formula: 'IFERROR(C' + r + '/$B$6,0)', result: N ? cnt / N : 0 }, fmt: '0.0%', center: true },
+              { v: { formula: 'SUMIF(' + keyR + ',B' + r + ',' + loanR + ')', result: amt }, fmt: XL_INR, right: true }
             ];
             cells.forEach((cd, j) => {
-              const c = row.getCell(j + 1);
+              const c = row.getCell(j + 2);
               c.value = cd.v;
               if (cd.fmt) c.numFmt = cd.fmt;
               c.border = xlBorder;
@@ -7984,37 +8130,43 @@
             });
             if (kind === 'Stage' || kind === 'Channel') {
               const tone = XL_TONES[xlToneFor(kind === 'Stage' ? 'stage' : 'channel', k)];
-              if (tone) { const c0 = row.getCell(1); c0.fill = xlFill(tone.fill); c0.font = xlFont(10, true, tone.font); }
+              if (tone) { const c0 = row.getCell(2); c0.fill = xlFill(tone.fill); c0.font = xlFont(10, true, tone.font); }
             }
           });
           const rl = r0 + keys.length - 1;
           const tr = ws.getRow(rl + 1);
-          tr.height = 22;
+          tr.height = 24;
           const totals = [
             { v: 'TOTAL' },
-            { v: { formula: 'SUM(B' + r0 + ':B' + rl + ')', result: sum(keys.map(k => L.rows.filter(x => (x[kind] || '') === k).length)) }, center: true },
-            { v: { formula: 'SUM(C' + r0 + ':C' + rl + ')', result: 1 }, fmt: '0.0%', center: true },
-            { v: { formula: 'SUM(D' + r0 + ':D' + rl + ')', result: sum(keys.map(k => sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0)))) }, fmt: XL_INR, right: true }
+            { v: { formula: 'SUM(C' + r0 + ':C' + rl + ')', result: sum(keys.map(k => L.rows.filter(x => (x[kind] || '') === k).length)) }, center: true },
+            { v: { formula: 'SUM(D' + r0 + ':D' + rl + ')', result: 1 }, fmt: '0.0%', center: true },
+            { v: { formula: 'SUM(E' + r0 + ':E' + rl + ')', result: sum(keys.map(k => sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0)))) }, fmt: XL_INR, right: true }
           ];
-          totals.forEach((cd, j) => {
-            const c = tr.getCell(j + 1);
-            c.value = cd.v;
-            if (cd.fmt) c.numFmt = cd.fmt;
-            c.fill = xlFill(XL.goldSoft);
-            c.font = xlFont(10, true, XL.ink);
-            c.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlThin, left: xlThin, right: xlThin };
-            c.alignment = { vertical: 'middle', horizontal: cd.center ? 'center' : cd.right ? 'right' : 'left', indent: cd.center ? 0 : 1 };
-          });
-          ws.addConditionalFormatting({ ref: 'B' + r0 + ':B' + rl, rules: [{ type: 'dataBar', priority: 1, gradient: true,
+          for (let c = 1; c <= 6; c++) {
+            const cell = tr.getCell(c);
+            cell.fill = xlGloss(GLOSS_SOFT);
+            cell.font = xlFont(10, true, XL.ink);
+            cell.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlGoldEdge, left: xlGoldEdge, right: xlGoldEdge };
+            if (c >= 2 && c <= 5) {
+              const cd = totals[c - 2];
+              cell.value = cd.v;
+              if (cd.fmt) cell.numFmt = cd.fmt;
+              cell.alignment = { vertical: 'middle', horizontal: cd.center ? 'center' : cd.right ? 'right' : 'left', indent: cd.center ? 0 : 1 };
+            }
+          }
+          ws.addConditionalFormatting({ ref: 'C' + r0 + ':C' + rl, rules: [{ type: 'dataBar', priority: 1, gradient: true,
             cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: 'FFE9CF85' } }] });
-          return rl + 4;
+          xlFrame(ws, 1, startRow, 6, rl + 1, !!imgs, !!imgs);
+          xlShadow(ws, 1, startRow, 6, rl + 1);
+          xlRound(ws, imgs, 1, startRow, 6, rl + 1, true, true);
+          return rl + 5;
         }
         const countBy = kind => {
           const m = {};
           L.rows.forEach(r => { const k = r[kind] || ''; if (k) m[k] = (m[k] || 0) + 1; });
           return Object.keys(m).sort((a, b) => m[b] - m[a]);
         };
-        let next = 11;
+        let next = 15;
         next = table(next, 'Pipeline by stage', 'Stage', stageR, 'Stage', countBy('Stage'));
         next = table(next, 'By loan type', 'Loan type', typeR, 'Loan Type', countBy('Loan Type'));
         next = table(next, 'By channel', 'Channel', chanR, 'Channel', countBy('Channel'));
@@ -8026,9 +8178,11 @@
         wb.creator = 'Solitaire Finz Mart';
         wb.created = new Date();
         wb.title = 'Solitaire lead report';
+        // Rounded-corner images (skipped quietly if the device cannot draw them)
+        const imgs = xlCornerFactory(wb);
         const hasLeads = sheets.some(s => s.name === 'Leads' && s.rows.length);
-        if (ctx.dashboard && hasLeads) dashboardSheet(wb, sheets, ctx.stamp);
-        sheets.forEach(sp => { if (sp.rows.length) styledSheet(wb, sp, ctx.stamp); });
+        if (ctx.dashboard && hasLeads) dashboardSheet(wb, sheets, ctx.stamp, imgs);
+        sheets.forEach(sp => { if (sp.rows.length) styledSheet(wb, sp, ctx.stamp, imgs); });
         return wb.xlsx.writeBuffer();
       }
 
