@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ===== BASE STYLES ===== */
@@ -2365,7 +2366,73 @@
     @media (max-width: 440px) {
       #app, .splash-container { height: 100vh; height: 100dvh; }
     }
+
+    /* ===== SETTINGS ===== */
+    .set-label {
+      margin: 14px 0 8px; font-size: 10.5px; color: #c9a84c;
+      letter-spacing: 1.5px; text-transform: uppercase;
+    }
+    .seg { display: flex; gap: 6px; }
+    .seg-wrap { flex-wrap: wrap; }
+    .seg button {
+      flex: 1 1 0; min-width: 0; padding: 10px 6px; cursor: pointer; font-size: 12.5px; color: #c8bca8;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(201, 168, 76, 0.18);
+      border-radius: 10px; transition: 0.2s;
+    }
+    .seg-wrap button { flex: 1 1 45%; }
+    .seg button.on {
+      color: #14141e; font-weight: 700; border-color: #c9a84c;
+      background: linear-gradient(135deg, #e6c566, #c9a84c);
+      box-shadow: 0 0 14px rgba(201, 168, 76, 0.3);
+    }
+    .set-toggle {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;
+      padding: 11px 12px; margin-bottom: 8px; border-radius: 12px; font-size: 13px; color: #e8dcc0;
+      background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(201, 168, 76, 0.14);
+    }
+    .set-toggle small { display: block; font-size: 10.5px; color: #8a7f66; margin-top: 2px; }
+    .set-switch {
+      position: relative; flex-shrink: 0; width: 42px; height: 24px; border-radius: 12px;
+      background: #2a2a3a; border: 1px solid rgba(201, 168, 76, 0.25); transition: 0.2s;
+    }
+    .set-switch::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+      background: #a89b7a; transition: 0.2s;
+    }
+    .set-toggle.on .set-switch { background: #c9a84c; border-color: #c9a84c; }
+    .set-toggle.on .set-switch::after { left: 20px; background: #14141e; }
+
+    /* Text size: scales the content area (header and bottom bar stay put) */
+    .screen-container { zoom: var(--ui-zoom, 1); }
+
+    /* Light mode: the dark theme is inverted, photos are flipped back */
+    html.theme-light body { background: #d9d5c8; }
+    html.theme-light #app, html.theme-light #splashScreen { filter: invert(0.92) hue-rotate(180deg); }
+    html.theme-light #app img, html.theme-light #splashScreen img { filter: invert(1) hue-rotate(180deg); }
+
+    html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after {
+      animation: none !important; transition: none !important;
+    }
+    html.compact-ui .pipeline-item { padding: 10px 12px 10px 16px; margin-bottom: 8px; }
+    html.compact-ui .pipeline-item::before { top: 10px; bottom: 10px; }
+    html.compact-ui .form-group { margin-bottom: 10px; }
+    html.compact-ui .card-title { padding-bottom: 6px; margin-bottom: 10px; }
   </style>
+<script>
+(function () {
+  try {
+    var s = JSON.parse(localStorage.getItem('solitaire_settings') || '{}');
+    var t = s.theme || 'dark';
+    if (t === 'auto') t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    var c = document.documentElement.classList;
+    if (t === 'light') c.add('theme-light');
+    if (s.reduceMotion) c.add('reduce-motion');
+    if (s.compact) c.add('compact-ui');
+    var z = { s: 0.9, m: 1, l: 1.12, xl: 1.25 }[s.textSize || 'm'] || 1;
+    document.documentElement.style.setProperty('--ui-zoom', z);
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 
@@ -2533,7 +2600,7 @@
           </div>
           <div class="hm-item"><i class="fas fa-search" id="searchIcon" title="Search leads"></i><span>Search</span></div>
           <div class="hm-item"><i class="fas fa-key" id="changePasswordIcon" title="Change Password" style="color:#c9a84c; cursor:pointer;"></i><span>Change Password</span></div>
-          <div class="hm-item"><i class="fas fa-sliders-h"></i><span>Settings</span></div>
+          <div class="hm-item"><i class="fas fa-sliders-h" id="settingsIcon" title="Settings"></i><span>Settings</span></div>
           <div class="hm-item hm-danger"><i class="fas fa-sign-out-alt" id="logoutBtn" title="Logout" style="color:#d46a6a;"></i><span>Logout</span></div>
         </div>
       </div>
@@ -2562,6 +2629,46 @@
         </div>
         <input type="search" id="leadSearchInput" class="lead-search-input" placeholder="Type client name or phone number" autocomplete="off">
         <div id="leadSearchResults" style="max-height:55vh; overflow-y:auto; margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="share-overlay" id="settingsOverlay">
+      <div class="share-card" style="max-width:420px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="margin:0; font-size:16px;"><i class="fas fa-sliders-h" style="color:#c9a84c;"></i> Settings</h2>
+          <span id="settingsCloseBtn" style="cursor:pointer; font-size:20px; color:#c8bca8; padding:0 4px;">&times;</span>
+        </div>
+
+        <div class="set-label">Appearance</div>
+        <div class="seg" data-setting="theme">
+          <button data-val="dark">🌙 Dark</button>
+          <button data-val="light">☀️ Light</button>
+          <button data-val="auto">🖥️ Auto</button>
+        </div>
+
+        <div class="set-label">Text size</div>
+        <div class="seg" data-setting="textSize">
+          <button data-val="s" style="font-size:11px;">A−</button>
+          <button data-val="m" style="font-size:13px;">A</button>
+          <button data-val="l" style="font-size:15px;">A+</button>
+          <button data-val="xl" style="font-size:17px;">A++</button>
+        </div>
+
+        <div class="set-label">Open this screen after login</div>
+        <div class="seg seg-wrap" data-setting="startScreen">
+          <button data-val="reports">Reports</button>
+          <button data-val="capture">Capture</button>
+          <button data-val="pipeline">Pipeline</button>
+          <button data-val="simulator">Simulator</button>
+        </div>
+
+        <div class="set-label">Display</div>
+        <div class="set-toggle" data-toggle="compact"><span>Compact lists<small>Tighter spacing on lead cards</small></span><i class="set-switch"></i></div>
+        <div class="set-toggle" data-toggle="reduceMotion"><span>Reduce animations<small>Turns off slides, glows and shine</small></span><i class="set-switch"></i></div>
+
+        <div id="settingsWho" style="margin-top:14px; font-size:11px; color:#8a7f66; text-align:center;"></div>
+        <button class="btn-secondary btn-sm" id="settingsResetBtn" style="width:100%; margin-top:10px;"><i class="fas fa-undo"></i> Reset to defaults</button>
       </div>
     </div>
 
@@ -3510,14 +3617,14 @@
         <div id="detailView" class="detail-view" style="display:none;"></div>
 
         <div class="card" style="margin-top:12px;">
-          <div class="card-title"><i class="fas fa-file-export"></i> Export Data</div>
+          <div class="card-title"><i class="fas fa-table"></i> Spreadsheet</div>
           <div class="export-section">
-            <button class="btn-secondary" id="exportExcelBtn"><i class="fas fa-file-excel"></i> Export Excel</button>
+            <button class="btn-secondary" id="exportExcelBtn"><i class="fas fa-table"></i> Download Spreadsheet</button>
             <button class="btn-secondary" id="exportWixBtn"><i class="fas fa-cloud-upload-alt"></i> Wix CRM</button>
             <button class="btn-secondary" id="exportMyLeadsBtn"><i class="fas fa-user-tag"></i> My Leads</button>
           </div>
           <div style="font-size:10px; color:#4a4250; margin-top:6px; text-align:center;">
-            <span id="exportStatus">Ready to export</span>
+            <span id="exportStatus">Ready — tap Download Spreadsheet</span>
           </div>
         </div>
       </div>
@@ -5249,7 +5356,9 @@
         // Home screen = Reports (opens once per login). Roles without Reports stay on Capture.
         if (window.__homeAppliedFor !== currentUser) {
           window.__homeAppliedFor = currentUser;
-          const repTab = document.querySelector('.nav-item[data-screen="reports"]');
+          let startScreen = 'reports';
+          try { startScreen = (JSON.parse(localStorage.getItem('solitaire_settings') || '{}').startScreen) || 'reports'; } catch (e) {}
+          const repTab = document.querySelector('.nav-item[data-screen="' + startScreen + '"]');
           const capTab = document.querySelector('.nav-item[data-screen="capture"]');
           if (repTab && !repTab.classList.contains('hidden-tab')) repTab.click();
           else if (capTab) capTab.click();
@@ -7490,56 +7599,585 @@
       // ================================================================
       // 22. EXPORT
       // ================================================================
-      document.getElementById('exportExcelBtn').addEventListener('click', function() {
-        if (leads.length === 0) { document.getElementById('exportStatus').textContent = '⚠️ No leads to export.'; return; }
-        const data = leads.map(l => ({
-          'ID': l.id,
-          'Name': l.borrower.name,
-          'Phone': l.borrower.phone,
-          'CIBIL Score': l.borrower.cibilScore || '',
-          'CIBIL Band': l.borrower.cibilBand || '',
-          'Co-applicant CIBIL': coCibilText(l),
-          'Email': l.borrower.email,
-          'Education': l.borrower.education || '',
-          'Age': l.borrower.age || '',
-          'Employment': l.borrower.employment || '',
-          'Retirement Age': l.borrower.retirementAge || '',
-          'Max Term': l.borrower.retirementInfo?.maxTerm || '',
-          'Pension': l.borrower.retirementInfo?.pensionFactor > 0 ? '50%' : 'No',
-          'Loan Type': l.loanType,
-          'Loan Amount': l.loanAmount,
-          'Credit': l.credit,
-          'Institution': l.institutionName,
-          'Assigned BA': l.assignedBA ? getTeamMemberName(l.assignedBA, 'ba') : '',
-          'Assigned Legal': l.assignedLegal ? getTeamMemberName(l.assignedLegal, 'legal') : '',
-          'Assigned Technical': l.assignedTechnical ? getTeamMemberName(l.assignedTechnical, 'technical') : '',
-          'Assigned Credit': l.assignedCredit ? getTeamMemberName(l.assignedCredit, 'credit') : '',
-          'Credit Status': l.creditStatus || 'pending',
-          'Credit Submitted': l.creditSubmitted ? 'Yes' : 'No',
-          'Legal Status': l.legalStatus || 'pending',
-          'Technical Status': l.technicalStatus || 'pending',
-          'Legal Submitted': l.legalSubmitted ? 'Yes' : 'No',
-          'Technical Submitted': l.technicalSubmitted ? 'Yes' : 'No',
-          'Stage': l.stage,
-          'Co-applicants': l.coApplicants?.length || 0,
-          'References': l.references?.length || 0,
-          'Property Type': l.property?.type || '',
-          'Property Value': l.property?.value || 0,
-          'BT Amount': l.btTopUpData?.btAmount || 0,
-          'Top Up Amount': l.btTopUpData?.topUpAmount || 0,
-          'Current Bank': l.btTopUpData?.currentBank || '',
-          'Created': new Date(l.createdAt).toLocaleDateString()
+      // ---- Spreadsheet helpers -------------------------------------------------
+      const SHEET_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const xFmtDate = d => {
+        const dt = new Date(d);
+        return isNaN(dt) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      };
+      const xName = (id, type) => id ? getTeamMemberName(id, type) : '';
+
+      // One tidy sheet: columns sized to their content, header filter on
+      function sheetFromRows(rows) {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const headers = Object.keys(rows[0]);
+        ws['!cols'] = headers.map(h => ({
+          wch: Math.min(42, Math.max(h.length, ...rows.map(r => String(r[h] === undefined || r[h] === null ? '' : r[h]).length)) + 2)
         }));
+        ws['!autofilter'] = { ref: ws['!ref'] };
+        return ws;
+      }
+      function addSheet(wb, name, rows) {
+        if (rows && rows.length) XLSX.utils.book_append_sheet(wb, sheetFromRows(rows), name);
+      }
+
+      function bytesToBase64(buf) {
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        return btoa(bin);
+      }
+
+      // App wrappers (Android web view) cannot download blob:/data: files. Android's download manager only
+      // accepts normal https links, so the file is put in the private storage bucket and a short-lived link is used.
+      async function cloudLinkForFile(blob, fileName) {
+        if (!sb) throw new Error('Cloud storage is not connected');
+        const who = sanitizeFileName(String(currentUser || 'user'));
+        const path = 'exports/' + who + '/' + fileName;
+        const up = await sb.storage.from(DOC_BUCKET).upload(path, blob, { upsert: true, contentType: SHEET_MIME });
+        if (up.error) throw new Error(up.error.message || 'Upload failed');
+        const signed = await sb.storage.from(DOC_BUCKET).createSignedUrl(path, 300, { download: fileName });
+        if (signed.error) throw new Error(signed.error.message || 'Could not create link');
+        setTimeout(() => { sb.storage.from(DOC_BUCKET).remove([path]); }, 6 * 60 * 1000); // tidy up after use
+        return signed.data.signedUrl;
+      }
+
+      // Save order: native app plugins (Capacitor) -> phone share sheet -> app web link -> normal download.
+      // A backup link is always shown (data: link, which many app wrappers accept when blob: links fail).
+      function saveWorkbook(wb, baseName, statusEl, doneText) {
+        return saveBytes(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), baseName, statusEl, doneText);
+      }
+      async function saveBytes(out, baseName, statusEl, doneText) {
+        const fileName = baseName + '_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+        const blob = new Blob([out], { type: SHEET_MIME });
+        const url = URL.createObjectURL(blob);
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+          (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform));
+        const isAndroidWebView = /Android/i.test(navigator.userAgent) && /; wv\)|Version\/\d+\.\d+ Chrome/i.test(navigator.userAgent);
+        let handled = false, cloudLink = null, cloudMsg = '';
+
+        // 1. Capacitor app: write the file to the phone, then open the share/save sheet
+        try {
+          const cap = window.Capacitor;
+          if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Filesystem && cap.Plugins.Share) {
+            const saved = await cap.Plugins.Filesystem.writeFile({ path: fileName, data: bytesToBase64(out), directory: 'CACHE' });
+            await cap.Plugins.Share.share({ title: fileName, url: saved.uri, dialogTitle: 'Save or share spreadsheet' });
+            handled = true;
+          }
+        } catch (e) { if (e && /cancel|dismiss/i.test(String(e.message || e))) handled = true; }
+
+        // 2. Phone share sheet (browsers and apps that support file sharing)
+        if (!handled && isMobile && navigator.canShare && typeof File === 'function') {
+          try {
+            const file = new File([blob], fileName, { type: SHEET_MIME });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: fileName });
+              handled = true;
+            }
+          } catch (e) { if (e && e.name === 'AbortError') handled = true; }
+        }
+
+        // 2b. Android app wrapper (web view): hand the file over as a normal https link
+        if (!handled && isAndroidWebView) {
+          try {
+            cloudLink = await cloudLinkForFile(blob, fileName);
+            window.open(cloudLink, '_blank');
+            handled = true;
+          } catch (e) { cloudMsg = (e && e.message) ? e.message : 'unknown error'; }
+        }
+
+        // 3. Normal download (desktop browsers, Chrome on Android)
+        if (!handled) {
+          const a = document.createElement('a');
+          a.href = url; a.download = fileName; a.style.display = 'none';
+          document.body.appendChild(a); a.click(); a.remove();
+        }
+
+        const linkStyle = 'color:#6a9ad4; text-decoration:underline;';
+        if (cloudLink) {
+          statusEl.innerHTML = '✅ ' + doneText + ' <a href="' + cloudLink + '" target="_blank" rel="noopener" style="' + linkStyle +
+            '">Tap here if the download did not start</a> (link works for 5 minutes)';
+        } else {
+          statusEl.innerHTML = '✅ ' + doneText + ' <a id="exportBackupLink" href="' + url + '" download="' + fileName +
+            '" style="' + linkStyle + '">Tap here if it did not download</a>' +
+            (isMobile ? ' · <a href="#" id="exportCloudLink" style="' + linkStyle + '">Get web link</a>' : '') +
+            (cloudMsg ? '<div style="color:#d4a86a; margin-top:4px;">⚠️ Web link failed: ' + escapeHtml(cloudMsg) + '</div>' : '');
+          // Backup link as a data: URL (works in more app wrappers than blob:)
+          try {
+            const fr = new FileReader();
+            fr.onload = () => {
+              const link = document.getElementById('exportBackupLink');
+              if (link && typeof fr.result === 'string') link.href = fr.result;
+            };
+            fr.readAsDataURL(blob);
+          } catch (e) {}
+          const cl = document.getElementById('exportCloudLink');
+          if (cl) cl.addEventListener('click', async ev => {
+            ev.preventDefault();
+            cl.textContent = 'Preparing…';
+            try {
+              const link = await cloudLinkForFile(blob, fileName);
+              window.open(link, '_blank');
+              cl.textContent = 'Get web link';
+            } catch (e) { cl.textContent = 'Failed: ' + ((e && e.message) || e); }
+          });
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000);
+      }
+      // ---- Professional spreadsheet styling (ExcelJS) --------------------------------------
+      const XL = { ink: 'FF14141E', gold: 'FFC9A84C', goldDeep: 'FFA8832F', goldSoft: 'FFF3E9C6', cream: 'FFFBF8EF', white: 'FFFFFFFF', line: 'FFE3D9B8', text: 'FF23232F', muted: 'FF7A7260' };
+      const XL_INR = '[>=10000000]"₹"##\\,##\\,##\\,##0;[>=100000]"₹"##\\,##\\,##0;"₹"##,##0';
+      const XL_TONES = {
+        green: { fill: 'FFD7F0E1', font: 'FF1E7A4D' }, red: { fill: 'FFF8D7D7', font: 'FFA13A3A' },
+        amber: { fill: 'FFFFF1C2', font: 'FF8A6A00' }, blue: { fill: 'FFDCE8FA', font: 'FF2A4F8A' },
+        purple: { fill: 'FFE9DDF5', font: 'FF6A3F8E' }, copper: { fill: 'FFFBE6CF', font: 'FF8A5516' },
+        grey: { fill: 'FFEDEDF2', font: 'FF55556A' }
+      };
+      function xlToneFor(kind, v) {
+        const t = String(v === null || v === undefined ? '' : v).toLowerCase();
+        if (!t) return null;
+        if (kind === 'stage') {
+          if (t.includes('declin')) return 'red';
+          if (t === 'approved') return 'green';
+          if (t === 'new') return 'grey';
+          if (t === 'contacted') return 'blue';
+          if (t === 'document collection') return 'amber';
+          if (t === 'underwriting') return 'purple';
+          if (t.startsWith('legal')) return 'blue';
+          if (t.startsWith('technical')) return 'copper';
+          return 'amber';
+        }
+        if (kind === 'status') {
+          if (t === 'approved' || t === 'yes') return 'green';
+          if (t === 'rejected' || t.includes('declin')) return 'red';
+          if (t === 'no') return 'grey';
+          return 'amber';
+        }
+        if (kind === 'band') return { excellent: 'green', good: 'blue', fair: 'amber', poor: 'red' }[t] || null;
+        if (kind === 'channel') return t === 'bank' ? 'blue' : t === 'nbfc' ? 'copper' : null;
+        return null;
+      }
+      const xlFill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+      const xlThin = { style: 'thin', color: { argb: XL.line } };
+      const xlBorder = { top: xlThin, left: xlThin, bottom: xlThin, right: xlThin };
+      const xlFont = (size, bold, argb, italic) => ({ name: 'Calibri', size, bold: !!bold, italic: !!italic, color: { argb } });
+      function xlsxDate(d) {
+        const dt = new Date(d);
+        return isNaN(dt) ? null : new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+      }
+      function fmtUtcDate(d) {
+        const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return String(d.getUTCDate()).padStart(2, '0') + '-' + m[d.getUTCMonth()] + '-' + d.getUTCFullYear();
+      }
+      function colLetter(n) {
+        let s = '';
+        while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+        return s;
+      }
+      function xlBanner(ws, n, title, stamp) {
+        ws.mergeCells(1, 1, 1, n);
+        ws.mergeCells(2, 1, 2, n);
+        const t = ws.getCell(1, 1);
+        t.value = 'SOLITAIRE FINZ MART  ·  ' + title.toUpperCase();
+        t.font = xlFont(16, true, XL.gold);
+        t.fill = xlFill(XL.ink);
+        t.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        const s = ws.getCell(2, 1);
+        s.value = stamp;
+        s.font = xlFont(10, false, XL.goldSoft, true);
+        s.fill = xlFill(XL.ink);
+        s.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        ws.getRow(1).height = 32;
+        ws.getRow(2).height = 18;
+        ws.getRow(3).height = 4;
+        for (let i = 1; i <= n; i++) ws.getCell(3, i).fill = xlFill(XL.gold);
+      }
+
+      // One data sheet: title banner, gold header, striped rows, colour-coded cells, totals, filter, frozen header
+      function styledSheet(wb, sp, stamp) {
+        const n = sp.cols.length, N = sp.rows.length;
+        const ws = wb.addWorksheet(sp.name, {
+          properties: { tabColor: { argb: sp.tab || XL.gold } },
+          views: [{ state: 'frozen', ySplit: 4, showGridLines: false }],
+          pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '4:4' }
+        });
+        ws.columns = sp.cols.map(c => ({ width: c.w || 16 }));
+        xlBanner(ws, n, sp.title, stamp + '  ·  ' + N + ' record' + (N === 1 ? '' : 's'));
+
+        const hr = ws.getRow(4);
+        hr.height = 28;
+        sp.cols.forEach((c, j) => {
+          const cell = hr.getCell(j + 1);
+          cell.value = c.h;
+          cell.font = xlFont(10, true, XL.ink);
+          cell.fill = xlFill(XL.gold);
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = { top: xlThin, left: xlThin, right: xlThin, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
+        });
+
+        sp.rows.forEach((row, i) => {
+          const r = ws.getRow(5 + i);
+          r.height = 20;
+          const zebra = i % 2 === 0 ? XL.white : XL.cream;
+          sp.cols.forEach((c, j) => {
+            const cell = r.getCell(j + 1);
+            const t = c.t || 'text';
+            let v = row[c.h];
+            cell.border = xlBorder;
+            cell.fill = xlFill(zebra);
+            cell.font = xlFont(10, false, XL.text);
+            cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            if (t === 'inr') {
+              v = (v === '' || v === undefined || v === null) ? null : Number(v);
+              cell.numFmt = XL_INR;
+              cell.alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+            } else if (t === 'int' || t === 'score') {
+              v = (v === '' || v === undefined || v === null) ? null : Number(v);
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+              if (t === 'score') cell.font = xlFont(10, true, XL.text);
+            } else if (t === 'date') {
+              cell.numFmt = 'dd-mmm-yyyy';
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (t === 'id') {
+              cell.font = xlFont(10, true, XL.muted);
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (t === 'center') {
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (t.startsWith('tone:')) {
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+              const tone = XL_TONES[xlToneFor(t.slice(5), v)];
+              if (tone) { cell.fill = xlFill(tone.fill); cell.font = xlFont(10, true, tone.font); }
+            }
+            cell.value = (v === '' || v === undefined) ? null : v;
+          });
+        });
+
+        const first = 5, last = 4 + N;
+        sp.cols.forEach((c, j) => {
+          const L = colLetter(j + 1), ref = L + first + ':' + L + last;
+          if (c.t === 'score') {
+            ws.addConditionalFormatting({ ref, rules: [{ type: 'colorScale', priority: 1,
+              cfvo: [{ type: 'num', value: 300 }, { type: 'num', value: 700 }, { type: 'num', value: 900 }],
+              color: [{ argb: 'FFF4B6B6' }, { argb: 'FFFFE9A8' }, { argb: 'FFA9DDBC' }] }] });
+          }
+          if (c.bar) {
+            ws.addConditionalFormatting({ ref, rules: [{ type: 'dataBar', priority: 2, gradient: true,
+              cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: 'FFE9CF85' } }] });
+          }
+        });
+
+        if (sp.totals && sp.totals.length) {
+          const tr = ws.getRow(last + 1);
+          tr.height = 24;
+          sp.cols.forEach((c, j) => {
+            const cell = tr.getCell(j + 1);
+            cell.fill = xlFill(XL.goldSoft);
+            cell.font = xlFont(10, true, XL.ink);
+            cell.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlThin, left: xlThin, right: xlThin };
+            cell.alignment = { vertical: 'middle', horizontal: c.t === 'inr' ? 'right' : 'left', indent: 1 };
+            if (j === 0) cell.value = 'TOTAL';
+            if (sp.totals.includes(c.h)) {
+              const L = colLetter(j + 1);
+              const sum = sp.rows.reduce((a, rr) => a + (Number(rr[c.h]) || 0), 0);
+              cell.value = { formula: 'SUBTOTAL(109,' + L + first + ':' + L + last + ')', result: sum };
+              cell.numFmt = XL_INR;
+            }
+          });
+        }
+        ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: last, column: n } };
+        return ws;
+      }
+
+      // Summary page with KPI tiles and breakdown tables (live formulas that point at the Leads sheet)
+      function dashboardSheet(wb, sheets, stamp) {
+        const L = sheets.find(s => s.name === 'Leads');
+        const A = sheets.find(s => s.name === 'Applicant');
+        const N = L.rows.length;
+        const colOf = (spec, h) => colLetter(spec.cols.findIndex(c => c.h === h) + 1);
+        const rng = (spec, h) => "'" + spec.name + "'!$" + colOf(spec, h) + '$5:$' + colOf(spec, h) + '$' + (4 + spec.rows.length);
+        const stageR = rng(L, 'Stage'), loanR = rng(L, 'Loan Amount (₹)'), idR = rng(L, 'Lead ID'),
+          typeR = rng(L, 'Loan Type'), chanR = rng(L, 'Channel');
+
+        const ws = wb.addWorksheet('Dashboard', {
+          properties: { tabColor: { argb: XL.ink } },
+          views: [{ showGridLines: false }],
+          pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+        });
+        ws.columns = [{ width: 27 }, { width: 27 }, { width: 27 }, { width: 27 }];
+        xlBanner(ws, 4, 'Portfolio Dashboard', stamp + '  ·  ' + N + ' lead' + (N === 1 ? '' : 's'));
+        ws.getRow(4).height = 8;
+
+        const sum = a => a.reduce((x, y) => x + y, 0);
+        const loans = L.rows.map(r => Number(r['Loan Amount (₹)']) || 0);
+        const stages = L.rows.map(r => r['Stage'] || '');
+        const approved = stages.filter(s => s === 'Approved').length;
+        const declined = stages.filter(s => String(s).includes('Declined')).length;
+        const scores = A ? A.rows.map(r => Number(r['CIBIL Score'])).filter(x => x >= 300 && x <= 900) : [];
+        const white = { style: 'thick', color: { argb: XL.white } };
+
+        function tile(r, c, label, value, fmt, formula) {
+          const lc = ws.getCell(r, c);
+          lc.value = label.toUpperCase();
+          lc.font = xlFont(9, true, XL.gold);
+          lc.fill = xlFill(XL.ink);
+          lc.alignment = { vertical: 'middle', horizontal: 'center' };
+          lc.border = { left: white, right: white };
+          const vc = ws.getCell(r + 1, c);
+          vc.value = formula ? { formula, result: value } : value;
+          if (fmt) vc.numFmt = fmt;
+          vc.font = xlFont(18, true, XL.ink);
+          vc.fill = xlFill(XL.cream);
+          vc.alignment = { vertical: 'middle', horizontal: 'center' };
+          vc.border = { left: white, right: white, bottom: { style: 'medium', color: { argb: XL.gold } } };
+        }
+        ws.getRow(5).height = 20; ws.getRow(6).height = 40; ws.getRow(7).height = 8;
+        ws.getRow(8).height = 20; ws.getRow(9).height = 40; ws.getRow(10).height = 12;
+        tile(5, 1, 'Total leads', N, '0', 'COUNTA(' + idR + ')');
+        tile(5, 2, 'Total loan amount', sum(loans), XL_INR, 'SUM(' + loanR + ')');
+        tile(5, 3, 'Average ticket', N ? sum(loans) / N : 0, XL_INR, 'IFERROR(AVERAGE(' + loanR + '),0)');
+        tile(5, 4, 'Conversion rate', N ? approved / N : 0, '0.0%', 'IFERROR(COUNTIF(' + stageR + ',"Approved")/COUNTA(' + idR + '),0)');
+        tile(8, 1, 'Approved', approved, '0', 'COUNTIF(' + stageR + ',"Approved")');
+        tile(8, 2, 'Declined', declined, '0', 'COUNTIF(' + stageR + ',"*Declined*")');
+        tile(8, 3, 'In progress', N - approved - declined, '0', 'A6-A9-B9');
+        tile(8, 4, 'Average CIBIL', scores.length ? Math.round(sum(scores) / scores.length) : 0, '0',
+          A ? 'IFERROR(ROUND(AVERAGE(' + rng(A, 'CIBIL Score') + '),0),0)' : null);
+
+        function table(startRow, title, headLabel, keyR, kind, keys) {
+          ws.mergeCells(startRow, 1, startRow, 4);
+          const bar = ws.getCell(startRow, 1);
+          bar.value = title.toUpperCase();
+          bar.font = xlFont(11, true, XL.gold);
+          bar.fill = xlFill(XL.ink);
+          bar.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+          ws.getRow(startRow).height = 24;
+          const hr = ws.getRow(startRow + 1);
+          hr.height = 22;
+          [headLabel, 'Leads', 'Share', 'Loan amount'].forEach((h, j) => {
+            const c = hr.getCell(j + 1);
+            c.value = h;
+            c.font = xlFont(10, true, XL.ink);
+            c.fill = xlFill(XL.gold);
+            c.alignment = { vertical: 'middle', horizontal: j === 0 ? 'left' : 'center', indent: j === 0 ? 1 : 0 };
+            c.border = { top: xlThin, left: xlThin, right: xlThin, bottom: { style: 'medium', color: { argb: XL.goldDeep } } };
+          });
+          const r0 = startRow + 2;
+          keys.forEach((k, i) => {
+            const r = r0 + i;
+            const row = ws.getRow(r);
+            row.height = 20;
+            const zebra = i % 2 === 0 ? XL.white : XL.cream;
+            const cnt = L.rows.filter(x => (x[kind] || '') === k).length;
+            const amt = sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0));
+            const cells = [
+              { v: k }, { v: { formula: 'COUNTIF(' + keyR + ',A' + r + ')', result: cnt }, center: true },
+              { v: { formula: 'IFERROR(B' + r + '/$A$6,0)', result: N ? cnt / N : 0 }, fmt: '0.0%', center: true },
+              { v: { formula: 'SUMIF(' + keyR + ',A' + r + ',' + loanR + ')', result: amt }, fmt: XL_INR, right: true }
+            ];
+            cells.forEach((cd, j) => {
+              const c = row.getCell(j + 1);
+              c.value = cd.v;
+              if (cd.fmt) c.numFmt = cd.fmt;
+              c.border = xlBorder;
+              c.fill = xlFill(zebra);
+              c.font = xlFont(10, j === 1, XL.text);
+              c.alignment = { vertical: 'middle', horizontal: cd.center ? 'center' : cd.right ? 'right' : 'left', indent: cd.center ? 0 : 1 };
+            });
+            if (kind === 'Stage' || kind === 'Channel') {
+              const tone = XL_TONES[xlToneFor(kind === 'Stage' ? 'stage' : 'channel', k)];
+              if (tone) { const c0 = row.getCell(1); c0.fill = xlFill(tone.fill); c0.font = xlFont(10, true, tone.font); }
+            }
+          });
+          const rl = r0 + keys.length - 1;
+          const tr = ws.getRow(rl + 1);
+          tr.height = 22;
+          const totals = [
+            { v: 'TOTAL' },
+            { v: { formula: 'SUM(B' + r0 + ':B' + rl + ')', result: sum(keys.map(k => L.rows.filter(x => (x[kind] || '') === k).length)) }, center: true },
+            { v: { formula: 'SUM(C' + r0 + ':C' + rl + ')', result: 1 }, fmt: '0.0%', center: true },
+            { v: { formula: 'SUM(D' + r0 + ':D' + rl + ')', result: sum(keys.map(k => sum(L.rows.filter(x => (x[kind] || '') === k).map(x => Number(x['Loan Amount (₹)']) || 0)))) }, fmt: XL_INR, right: true }
+          ];
+          totals.forEach((cd, j) => {
+            const c = tr.getCell(j + 1);
+            c.value = cd.v;
+            if (cd.fmt) c.numFmt = cd.fmt;
+            c.fill = xlFill(XL.goldSoft);
+            c.font = xlFont(10, true, XL.ink);
+            c.border = { top: { style: 'medium', color: { argb: XL.goldDeep } }, bottom: xlThin, left: xlThin, right: xlThin };
+            c.alignment = { vertical: 'middle', horizontal: cd.center ? 'center' : cd.right ? 'right' : 'left', indent: cd.center ? 0 : 1 };
+          });
+          ws.addConditionalFormatting({ ref: 'B' + r0 + ':B' + rl, rules: [{ type: 'dataBar', priority: 1, gradient: true,
+            cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: 'FFE9CF85' } }] });
+          return rl + 4;
+        }
+        const countBy = kind => {
+          const m = {};
+          L.rows.forEach(r => { const k = r[kind] || ''; if (k) m[k] = (m[k] || 0) + 1; });
+          return Object.keys(m).sort((a, b) => m[b] - m[a]);
+        };
+        let next = 11;
+        next = table(next, 'Pipeline by stage', 'Stage', stageR, 'Stage', countBy('Stage'));
+        next = table(next, 'By loan type', 'Loan type', typeR, 'Loan Type', countBy('Loan Type'));
+        next = table(next, 'By channel', 'Channel', chanR, 'Channel', countBy('Channel'));
+        return ws;
+      }
+
+      async function buildStyledWorkbook(sheets, ctx) {
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'Solitaire Finz Mart';
+        wb.created = new Date();
+        wb.title = 'Solitaire lead report';
+        const hasLeads = sheets.some(s => s.name === 'Leads' && s.rows.length);
+        if (ctx.dashboard && hasLeads) dashboardSheet(wb, sheets, ctx.stamp);
+        sheets.forEach(sp => { if (sp.rows.length) styledSheet(wb, sp, ctx.stamp); });
+        return wb.xlsx.writeBuffer();
+      }
+
+      // Styled workbook when the styling library loaded, plain sheets otherwise
+      async function buildAndSave(sheets, baseName, doneText, opts) {
+        const st = document.getElementById('exportStatus');
+        const stamp = 'Generated ' + fmtUtcDate(xlsxDate(new Date())) + ' by ' + ((currentUserData && currentUserData.name) || currentUser || 'user');
+        if (typeof ExcelJS !== 'undefined') {
+          try {
+            const bytes = await buildStyledWorkbook(sheets, { stamp, dashboard: !!(opts && opts.dashboard) });
+            return saveBytes(bytes, baseName, st, doneText);
+          } catch (e) { console.error('Styled export failed, falling back to plain sheets', e); }
+        }
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, 'Leads');
-        XLSX.writeFile(wb, 'Solitaire_Leads.xlsx');
-        document.getElementById('exportStatus').textContent = '✅ Exported successfully!';
+        sheets.forEach(sp => addSheet(wb, sp.name, sp.rows.map(r => {
+          const o = {};
+          Object.keys(r).forEach(k => { const v = r[k]; o[k] = v instanceof Date ? fmtUtcDate(v) : (v === null ? '' : v); });
+          return o;
+        })));
+        return saveWorkbook(wb, baseName, st, doneText);
+      }
+
+      function exportGuard(list, emptyMsg) {
+        const st = document.getElementById('exportStatus');
+        if (typeof XLSX === 'undefined') { st.textContent = '⚠️ Spreadsheet tool did not load. Check your internet and reload.'; return false; }
+        if (!list.length) { st.textContent = emptyMsg; return false; }
+        return true;
+      }
+
+      // ---- 1. Full spreadsheet: Dashboard + organised sheets, linked by Lead ID ----
+      document.getElementById('exportExcelBtn').addEventListener('click', function () {
+        const roleLeads = getRoleLeads();
+        if (!exportGuard(roleLeads, '⚠️ No leads to export.')) return;
+        const list = roleLeads.slice().sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
+        const TAB = { leads: 'FFC9A84C', applicant: 'FF5B8FD6', co: 'FF9B7BD1', property: 'FF4FB286', team: 'FFD98C5F', refs: 'FF8A8A9A' };
+
+        const leadsSheet = {
+          name: 'Leads', title: 'Lead Register', tab: TAB.leads, totals: ['Loan Amount (₹)'],
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Mobile', w: 16 }, { h: 'Email', w: 30 },
+            { h: 'Created', w: 14, t: 'date' }, { h: 'Stage', w: 22, t: 'tone:stage' }, { h: 'Loan Type', w: 28 },
+            { h: 'Loan Amount (₹)', w: 20, t: 'inr', bar: true }, { h: 'Channel', w: 11, t: 'tone:channel' },
+            { h: 'Institution', w: 24 }, { h: 'Credit Band', w: 13, t: 'tone:band' }, { h: 'Assigned BA', w: 22 }
+          ],
+          rows: list.map(l => ({
+            'Lead ID': l.id, 'Client Name': l.borrower.name, 'Mobile': l.borrower.phone, 'Email': l.borrower.email || '',
+            'Created': xlsxDate(l.createdAt), 'Stage': l.stage, 'Loan Type': l.loanType,
+            'Loan Amount (₹)': Number(l.loanAmount) || 0, 'Channel': l.institutionType || '',
+            'Institution': l.institutionName || '', 'Credit Band': l.credit || '', 'Assigned BA': xName(l.assignedBA, 'ba')
+          }))
+        };
+
+        const applicantSheet = {
+          name: 'Applicant', title: 'Applicant Profile', tab: TAB.applicant, totals: ['Annual Income (₹)', 'Monthly Debt (₹)'],
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Age', w: 8, t: 'int' }, { h: 'Education', w: 20 },
+            { h: 'Employment', w: 26 }, { h: 'Company / Business', w: 26 }, { h: 'Location', w: 20 }, { h: 'Pincode', w: 11, t: 'center' },
+            { h: 'Annual Income (₹)', w: 20, t: 'inr' }, { h: 'Monthly Debt (₹)', w: 18, t: 'inr' },
+            { h: 'CIBIL Score', w: 12, t: 'score' }, { h: 'CIBIL Band', w: 13, t: 'tone:band' }, { h: 'Profile Type', w: 36 },
+            { h: 'Retirement Age', w: 12, t: 'int' }, { h: 'Max Term (yrs)', w: 12, t: 'int' }, { h: 'Pension', w: 10, t: 'center' }
+          ],
+          rows: list.map(l => ({
+            'Lead ID': l.id, 'Client Name': l.borrower.name, 'Age': l.borrower.age || '', 'Education': l.borrower.education || '',
+            'Employment': l.borrower.employment || '', 'Company / Business': l.borrower.company || '',
+            'Location': l.borrower.location || '', 'Pincode': l.borrower.pincode || '',
+            'Annual Income (₹)': Number(l.borrower.income) || 0, 'Monthly Debt (₹)': Number(l.borrower.debt) || 0,
+            'CIBIL Score': l.borrower.cibilScore || '', 'CIBIL Band': l.borrower.cibilBand || '',
+            'Profile Type': profileFlagText(l), 'Retirement Age': l.borrower.retirementAge || '',
+            'Max Term (yrs)': l.borrower.retirementInfo?.maxTerm || '',
+            'Pension': l.borrower.retirementInfo?.pensionFactor > 0 ? '50%' : 'No'
+          }))
+        };
+
+        const coRows = [];
+        list.forEach(l => (l.coApplicants || []).forEach((c, i) => coRows.push({
+          'Lead ID': l.id, 'Client Name': l.borrower.name, 'Co-applicant #': i + 1, 'Co-applicant Name': c.name || '',
+          'Mobile': c.phone || '', 'Age': c.age || '', 'Employment': c.employment || '',
+          'Annual Income (₹)': Number(c.income) || 0, 'Monthly Debt (₹)': Number(c.debt) || 0,
+          'CIBIL Score': c.cibilScore || '', 'CIBIL Band': c.cibilBand || ''
+        })));
+        const coSheet = {
+          name: 'Co-applicants', title: 'Co-applicants', tab: TAB.co, totals: ['Annual Income (₹)', 'Monthly Debt (₹)'], rows: coRows,
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Co-applicant #', w: 13, t: 'int' },
+            { h: 'Co-applicant Name', w: 26 }, { h: 'Mobile', w: 16 }, { h: 'Age', w: 8, t: 'int' }, { h: 'Employment', w: 26 },
+            { h: 'Annual Income (₹)', w: 20, t: 'inr' }, { h: 'Monthly Debt (₹)', w: 18, t: 'inr' },
+            { h: 'CIBIL Score', w: 12, t: 'score' }, { h: 'CIBIL Band', w: 13, t: 'tone:band' }
+          ]
+        };
+
+        const propertySheet = {
+          name: 'Property & Loan', title: 'Property & Loan Details', tab: TAB.property,
+          totals: ['Loan Amount (₹)', 'Property Value (₹)', 'BT Amount (₹)', 'Top-up Amount (₹)'],
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Loan Type', w: 28 },
+            { h: 'Loan Amount (₹)', w: 20, t: 'inr', bar: true }, { h: 'Property Type', w: 30 },
+            { h: 'Property Value (₹)', w: 20, t: 'inr' }, { h: 'City', w: 18 }, { h: 'BT Amount (₹)', w: 18, t: 'inr' },
+            { h: 'Top-up Amount (₹)', w: 18, t: 'inr' }, { h: 'Current Bank', w: 24 }
+          ],
+          rows: list.map(l => ({
+            'Lead ID': l.id, 'Client Name': l.borrower.name, 'Loan Type': l.loanType,
+            'Loan Amount (₹)': Number(l.loanAmount) || 0, 'Property Type': l.property?.type || '',
+            'Property Value (₹)': Number(l.property?.value) || 0, 'City': l.property?.city || '',
+            'BT Amount (₹)': Number(l.btTopUpData?.btAmount) || 0, 'Top-up Amount (₹)': Number(l.btTopUpData?.topUpAmount) || 0,
+            'Current Bank': l.btTopUpData?.currentBank || ''
+          }))
+        };
+
+        const teamSheet = {
+          name: 'Team & Status', title: 'Team Assignment & Status', tab: TAB.team,
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Stage', w: 22, t: 'tone:stage' },
+            { h: 'Assigned BA', w: 22 }, { h: 'Assigned Legal', w: 22 }, { h: 'Legal Status', w: 14, t: 'tone:status' },
+            { h: 'Legal Submitted', w: 14, t: 'tone:status' }, { h: 'Assigned Technical', w: 22 },
+            { h: 'Technical Status', w: 15, t: 'tone:status' }, { h: 'Technical Submitted', w: 16, t: 'tone:status' },
+            { h: 'Assigned Credit', w: 22 }, { h: 'Credit Status', w: 14, t: 'tone:status' }, { h: 'Credit Submitted', w: 14, t: 'tone:status' }
+          ],
+          rows: list.map(l => ({
+            'Lead ID': l.id, 'Client Name': l.borrower.name, 'Stage': l.stage,
+            'Assigned BA': xName(l.assignedBA, 'ba'), 'Assigned Legal': xName(l.assignedLegal, 'legal'),
+            'Legal Status': l.legalStatus || 'pending', 'Legal Submitted': l.legalSubmitted ? 'Yes' : 'No',
+            'Assigned Technical': xName(l.assignedTechnical, 'technical'), 'Technical Status': l.technicalStatus || 'pending',
+            'Technical Submitted': l.technicalSubmitted ? 'Yes' : 'No', 'Assigned Credit': xName(l.assignedCredit, 'credit'),
+            'Credit Status': l.creditStatus || 'pending', 'Credit Submitted': l.creditSubmitted ? 'Yes' : 'No'
+          }))
+        };
+
+        const refRows = [];
+        list.forEach(l => (l.references || []).forEach((r, i) => refRows.push({
+          'Lead ID': l.id, 'Client Name': l.borrower.name, 'Reference #': i + 1, 'Reference Name': r.name || '',
+          'Mobile': r.phone || '', 'Relationship': r.relationship || '', 'Address': r.address || ''
+        })));
+        const refSheet = {
+          name: 'References', title: 'References', tab: TAB.refs, rows: refRows,
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Reference #', w: 12, t: 'int' },
+            { h: 'Reference Name', w: 26 }, { h: 'Mobile', w: 16 }, { h: 'Relationship', w: 18 }, { h: 'Address', w: 44 }
+          ]
+        };
+
+        buildAndSave([leadsSheet, applicantSheet, coSheet, propertySheet, teamSheet, refSheet], 'Solitaire_Leads',
+          'Spreadsheet ready (' + list.length + ' leads).', { dashboard: true });
       });
 
-      document.getElementById('exportWixBtn').addEventListener('click', function() {
-        if (leads.length === 0) { document.getElementById('exportStatus').textContent = '⚠️ No leads to export.'; return; }
-        const data = leads.map(l => ({
+      // ---- 2. Wix CRM (same columns as before, so imports keep working) ----
+      document.getElementById('exportWixBtn').addEventListener('click', function () {
+        const roleLeads = getRoleLeads();
+        if (!exportGuard(roleLeads, '⚠️ No leads to export.')) return;
+        const data = roleLeads.map(l => ({
           'Lead ID': l.id,
           'Full Name': l.borrower.name,
           'Phone': l.borrower.phone,
@@ -7550,51 +8188,41 @@
           'Loan Amount': l.loanAmount,
           'Credit Score Band': l.credit,
           'Institution': l.institutionName,
-          'Assigned BA': l.assignedBA ? getTeamMemberName(l.assignedBA, 'ba') : '',
+          'Assigned BA': xName(l.assignedBA, 'ba'),
           'Stage': l.stage,
-          'Created Date': new Date(l.createdAt).toLocaleDateString()
+          'Created Date': xFmtDate(l.createdAt)
         }));
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, 'WixCRM');
-        XLSX.writeFile(wb, 'Wix_CRM_Leads.xlsx');
-        document.getElementById('exportStatus').textContent = '✅ Wix CRM export ready!';
+        addSheet(wb, 'WixCRM', data);
+        saveWorkbook(wb, 'Wix_CRM_Leads', document.getElementById('exportStatus'), 'Wix CRM spreadsheet ready.');
       });
 
-      document.getElementById('exportMyLeadsBtn').addEventListener('click', function() {
-        const role = currentRole || 'guest';
-        let myLeads = [];
-        if (role === 'business') myLeads = leads.filter(l => l.assignedBA === currentUser);
-        else if (role === 'legal') myLeads = leads.filter(l => l.assignedLegal === currentUser);
-        else if (role === 'technical') myLeads = leads.filter(l => l.assignedTechnical === currentUser);
-        else myLeads = leads;
-        if (myLeads.length === 0) { document.getElementById('exportStatus').textContent =
-          '⚠️ No leads assigned to you.'; return; }
-        const data = myLeads.map(l => ({
-          'ID': l.id,
-          'Name': l.borrower.name,
-          'Phone': l.borrower.phone,
-          'CIBIL': l.borrower.cibilScore || '',
-          'Co-applicant CIBIL': coCibilText(l),
-          'Loan Type': l.loanType,
-          'Loan Amount': l.loanAmount,
-          'Stage': l.stage,
-          'Legal Status': l.legalStatus || 'pending',
-          'Technical Status': l.technicalStatus || 'pending',
-          'Assigned Legal': l.assignedLegal ? getTeamMemberName(l.assignedLegal, 'legal') : '',
-          'Assigned Technical': l.assignedTechnical ? getTeamMemberName(l.assignedTechnical, 'technical') : '',
-          'Assigned Credit': l.assignedCredit ? getTeamMemberName(l.assignedCredit, 'credit') : '',
-          'Credit Status': l.creditStatus || 'pending',
-          'Credit Submitted': l.creditSubmitted ? 'Yes' : 'No',
-          'BT Amount': l.btTopUpData?.btAmount || 0,
-          'Top Up Amount': l.btTopUpData?.topUpAmount || 0,
-          'Created': new Date(l.createdAt).toLocaleDateString()
-        }));
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, 'MyLeads');
-        XLSX.writeFile(wb, 'My_Leads.xlsx');
-        document.getElementById('exportStatus').textContent = '✅ My Leads exported!';
+      // ---- 3. My Leads: one styled sheet, columns in working order ----
+      document.getElementById('exportMyLeadsBtn').addEventListener('click', function () {
+        const myLeads = getRoleLeads().slice().sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
+        if (!exportGuard(myLeads, '⚠️ No leads assigned to you.')) return;
+        const sheet = {
+          name: 'My Leads', title: 'My Leads', tab: 'FFC9A84C', totals: ['Loan Amount (₹)', 'BT Amount (₹)', 'Top-up Amount (₹)'],
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Created', w: 14, t: 'date' }, { h: 'Client Name', w: 26 }, { h: 'Mobile', w: 16 },
+            { h: 'Stage', w: 22, t: 'tone:stage' }, { h: 'Loan Type', w: 28 }, { h: 'Loan Amount (₹)', w: 20, t: 'inr', bar: true },
+            { h: 'CIBIL', w: 10, t: 'score' }, { h: 'Co-applicant CIBIL', w: 34 }, { h: 'Assigned Legal', w: 22 },
+            { h: 'Legal Status', w: 14, t: 'tone:status' }, { h: 'Assigned Technical', w: 22 }, { h: 'Technical Status', w: 15, t: 'tone:status' },
+            { h: 'Assigned Credit', w: 22 }, { h: 'Credit Status', w: 14, t: 'tone:status' }, { h: 'Credit Submitted', w: 14, t: 'tone:status' },
+            { h: 'BT Amount (₹)', w: 18, t: 'inr' }, { h: 'Top-up Amount (₹)', w: 18, t: 'inr' }
+          ],
+          rows: myLeads.map(l => ({
+            'Lead ID': l.id, 'Created': xlsxDate(l.createdAt), 'Client Name': l.borrower.name, 'Mobile': l.borrower.phone,
+            'Stage': l.stage, 'Loan Type': l.loanType, 'Loan Amount (₹)': Number(l.loanAmount) || 0,
+            'CIBIL': l.borrower.cibilScore || '', 'Co-applicant CIBIL': coCibilText(l),
+            'Assigned Legal': xName(l.assignedLegal, 'legal'), 'Legal Status': l.legalStatus || 'pending',
+            'Assigned Technical': xName(l.assignedTechnical, 'technical'), 'Technical Status': l.technicalStatus || 'pending',
+            'Assigned Credit': xName(l.assignedCredit, 'credit'), 'Credit Status': l.creditStatus || 'pending',
+            'Credit Submitted': l.creditSubmitted ? 'Yes' : 'No',
+            'BT Amount (₹)': Number(l.btTopUpData?.btAmount) || 0, 'Top-up Amount (₹)': Number(l.btTopUpData?.topUpAmount) || 0
+          }))
+        };
+        buildAndSave([sheet], 'My_Leads', 'My Leads spreadsheet ready.', { dashboard: false });
       });
 
       // ================================================================
@@ -8282,6 +8910,79 @@
     };
     if (badge) new MutationObserver(sync).observe(badge, { attributes: true, childList: true, characterData: true, subtree: true });
     sync();
+  })();
+  </script>
+
+  <!-- Settings: appearance, text size, start screen, display options (saved on this device) -->
+  <script>
+  (function () {
+    const KEY = 'solitaire_settings';
+    const DEFAULTS = { theme: 'dark', textSize: 'm', startScreen: 'reports', compact: false, reduceMotion: false };
+    const ZOOM = { s: 0.9, m: 1, l: 1.12, xl: 1.25 };
+    const overlay = document.getElementById('settingsOverlay');
+    if (!overlay) return;
+    const root = document.documentElement;
+
+    function load() {
+      try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+      catch (e) { return Object.assign({}, DEFAULTS); }
+    }
+    function save(st) { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+    let settings = load();
+
+    function resolvedTheme() {
+      if (settings.theme === 'auto') return (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      return settings.theme;
+    }
+    function apply() {
+      root.classList.toggle('theme-light', resolvedTheme() === 'light');
+      root.classList.toggle('reduce-motion', !!settings.reduceMotion);
+      root.classList.toggle('compact-ui', !!settings.compact);
+      root.style.setProperty('--ui-zoom', ZOOM[settings.textSize] || 1);
+    }
+    function paint() {
+      overlay.querySelectorAll('.seg').forEach(seg => {
+        const key = seg.dataset.setting;
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.val === settings[key]));
+      });
+      overlay.querySelectorAll('.set-toggle').forEach(t => t.classList.toggle('on', !!settings[t.dataset.toggle]));
+      const who = document.getElementById('userNameDisplay');
+      const el = document.getElementById('settingsWho');
+      if (el) el.textContent = who && who.textContent.trim() ? 'Signed in as ' + who.textContent.trim() : '';
+    }
+    function open() { paint(); overlay.classList.add('show'); }
+    function close() { overlay.classList.remove('show'); }
+
+    document.getElementById('settingsIcon')?.addEventListener('click', open);
+    document.getElementById('settingsCloseBtn')?.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    overlay.querySelectorAll('.seg').forEach(seg => {
+      seg.addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        settings[seg.dataset.setting] = b.dataset.val;
+        save(settings); apply(); paint();
+      });
+    });
+    overlay.querySelectorAll('.set-toggle').forEach(t => {
+      t.addEventListener('click', () => {
+        settings[t.dataset.toggle] = !settings[t.dataset.toggle];
+        save(settings); apply(); paint();
+      });
+    });
+    document.getElementById('settingsResetBtn')?.addEventListener('click', () => {
+      settings = Object.assign({}, DEFAULTS);
+      save(settings); apply(); paint();
+    });
+
+    // Auto theme follows the device
+    if (window.matchMedia) {
+      const mq = matchMedia('(prefers-color-scheme: light)');
+      const onChange = () => { if (settings.theme === 'auto') apply(); };
+      if (mq.addEventListener) mq.addEventListener('change', onChange); else if (mq.addListener) mq.addListener(onChange);
+    }
+    apply();
   })();
   </script>
 
