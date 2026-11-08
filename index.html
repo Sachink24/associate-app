@@ -2489,6 +2489,9 @@
     .pt-meta { font-size: 11px; color: #a89b7a; margin-top: 3px; }
     .pt-next { display: flex; justify-content: space-between; font-size: 11px; color: #8ab4d6; }
     .pt-next b { color: #e6c566; }
+
+    .ps-final { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; font-size: 11px; color: #a89b7a; cursor: pointer; }
+    .ps-final input { margin-top: 2px; accent-color: #c9a84c; }
   </style>
 <script>
 (function () {
@@ -3993,6 +3996,7 @@
           credit_roi: lead.creditROI || null,
           credit_fees: lead.creditFees || null,
           credit_conditions: lead.creditConditions || null,
+          post_sanction: getPS(lead),
           credit_observation: lead.creditObservation || null,
           credit_recommendation: lead.creditRecommendation || null,
           legal_observation: lead.legalObservation || null,
@@ -4059,6 +4063,7 @@
           creditROI: row.credit_roi,
           creditFees: row.credit_fees,
           creditConditions: row.credit_conditions,
+          postSanction: (row.post_sanction && Object.keys(row.post_sanction).length) ? row.post_sanction : ((row.borrower && row.borrower.postSanction) || {}),
           creditObservation: row.credit_observation,
           creditRecommendation: row.credit_recommendation,
           legalObservation: row.legal_observation,
@@ -6223,9 +6228,11 @@
           return (finished(a) - finished(b)) || (a.st.done - b.st.done) || (new Date(a.t.date || 0) - new Date(b.t.date || 0));
         });
         return rows.map(({ l, t, st }) => {
-          const next = POST_SANCTION_STEPS.find(x => !st.ps[x.key]);
-          const nextTxt = next ? 'Next: ' + next.icon + ' ' + next.label
-            : '✅ Disbursed' + (st.ps.disbursed && st.ps.disbursed.amount ? ' ' + inr(st.ps.disbursed.amount) + ' on ' + fmtDateShort(st.ps.disbursed.date) : '');
+          const next = POST_SANCTION_STEPS.find(x => !stepDone(l, x.key));
+          const di = st.disb;
+          const nextTxt = next
+            ? (next.key === 'disbursed' && di.list.length ? 'Next: 💸 Release balance ' + inr(di.balance) + ' (' + inr(di.total) + ' released)' : 'Next: ' + next.icon + ' ' + next.label)
+            : '✅ Disbursed ' + inr(di.total) + (di.balance > 1 ? ' (closed, balance ' + inr(di.balance) + ')' : '');
           return `<div class="pt-row" data-id="${escapeHtml(l.id)}">
             <div class="pt-top"><strong>${escapeHtml(l.borrower.name)}</strong><span>${t.amount ? inr(t.amount) : '—'}</span></div>
             <div class="pt-meta">${t.emi ? 'EMI ' + inr(t.emi) + ' · ' : ''}${t.months ? t.months + ' months' : ''}${t.roi ? ' @ ' + t.roi + '%' : ''}${t.date ? ' · sanctioned ' + escapeHtml(fmtDateShort(t.date)) : ''}</div>
@@ -6912,6 +6919,9 @@
       // ================================================================
       // POST-SANCTION PHASE: sanction card (amount, term, ROI, EMI) + progress after sanction
       // ================================================================
+      // Post-sanction data lives in leads.post_sanction (older saves inside borrower.postSanction are still read)
+      function getPS(lead) { return lead.postSanction || (lead.borrower && lead.borrower.postSanction) || {}; }
+      function setPS(lead, ps) { lead.postSanction = ps; if (lead.borrower) delete lead.borrower.postSanction; }
       const POST_SANCTION_STEPS = [
         { key: 'letter', icon: '📄', label: 'Sanction letter issued' },
         { key: 'accepted', icon: '✍️', label: 'Customer accepted terms' },
@@ -6940,13 +6950,33 @@
           totalPayable: emi * months, totalInterest: Math.max(0, emi * months - amount),
           date: sn.sanction_date || sn.created_at || lead.approvedAt || null,
           by: sn.approved_by || lead.approvedBy || '',
-          fees: lead.creditFees || '', conditions: lead.creditConditions || ''
+          fees: [sn.processing_fee > 0 ? 'Processing ₹' + Math.round(sn.processing_fee).toLocaleString('en-IN') : '',
+                 sn.insurance > 0 ? 'Insurance ₹' + Math.round(sn.insurance).toLocaleString('en-IN') : ''].filter(Boolean).join(' · ') || lead.creditFees || '',
+          conditions: sn.conditions || lead.creditConditions || '',
+          banker: sn.banker || '', ref: sn.sanction_reference_no || ''
         };
       }
+      // Releases (part-disbursements) with a running balance. The single-entry format used earlier is still read.
+      function disbursementInfo(lead) {
+        const ps = getPS(lead);
+        let list = Array.isArray(ps.disbursements) ? ps.disbursements.slice() : [];
+        if (!list.length && ps.disbursed && ps.disbursed.amount) list = [ps.disbursed];
+        const amount = getSanctionTerms(lead).amount;
+        const total = list.reduce((a, r) => a + (Number(r.amount) || 0), 0);
+        const balance = amount ? Math.max(0, amount - total) : 0;
+        const closed = !!ps.disbursementClosed;
+        const full = list.length > 0 && (closed || !amount || balance <= 1);
+        return { list, total, balance, amount, closed, full };
+      }
+      function stepDone(lead, key) {
+        if (key === 'disbursed') return disbursementInfo(lead).full;
+        const ps = getPS(lead);
+        return !!ps[key];
+      }
       function postSanctionState(lead) {
-        const ps = (lead.borrower && lead.borrower.postSanction) || {};
-        const done = POST_SANCTION_STEPS.filter(st => ps[st.key]).length;
-        return { ps, done, total: POST_SANCTION_STEPS.length };
+        const ps = getPS(lead);
+        const done = POST_SANCTION_STEPS.filter(st => stepDone(lead, st.key)).length;
+        return { ps, done, total: POST_SANCTION_STEPS.length, disb: disbursementInfo(lead) };
       }
       const fmtDateShort = d => {
         const dt = new Date(d);
@@ -6954,39 +6984,55 @@
       };
       function sanctionCardHtml(lead) {
         if (!isSanctioned(lead)) return '';
-        const t = getSanctionTerms(lead), st = postSanctionState(lead);
+        const t = getSanctionTerms(lead), st = postSanctionState(lead), di = st.disb;
         const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
         const years = t.months ? (t.months / 12).toFixed(1).replace(/\.0$/, '') : '';
         const canEdit = currentRole === 'owner' || currentRole === 'business';
         const missing = !(t.amount && t.months && t.roi);
         const tile = (label, value, sub) => `<div class="sc-tile"><div class="sc-label">${label}</div><div class="sc-value">${value}</div>${sub ? `<div class="sc-sub">${sub}</div>` : ''}</div>`;
         const steps = POST_SANCTION_STEPS.map((step, i) => {
-          const rec = st.ps[step.key];
-          const prevDone = i === 0 || st.ps[POST_SANCTION_STEPS[i - 1].key];
-          const cls = rec ? 'done' : prevDone ? 'next' : 'wait';
-          // the last step is recorded through the disbursement form below (amount + date)
-          const clickable = canEdit && (rec || step.key !== 'disbursed');
-          const extra = rec ? [step.key === 'disbursed' && rec.amount ? inr(rec.amount) : '', fmtDateShort(rec.date), rec.by || ''].filter(Boolean).map(escapeHtml).join(' · ') : '';
+          const isDisb = step.key === 'disbursed';
+          const rec = stepDone(lead, step.key);
+          const partial = isDisb && !rec && di.list.length > 0;
+          const prevDone = i === 0 || stepDone(lead, POST_SANCTION_STEPS[i - 1].key);
+          const cls = rec ? 'done' : (partial || prevDone) ? 'next' : 'wait';
+          const clickable = canEdit && (isDisb ? di.list.length > 0 : true);
+          let extra = '';
+          if (isDisb) {
+            if (di.list.length) extra = escapeHtml(inr(di.total) + (di.amount ? ' of ' + inr(di.amount) : '') + ' · ' + di.list.length + ' release' + (di.list.length > 1 ? 's' : ''));
+          } else if (st.ps[step.key]) {
+            const r = st.ps[step.key];
+            extra = [fmtDateShort(r.date), r.by || ''].filter(Boolean).map(escapeHtml).join(' · ');
+          }
           return `<div class="ps-step ${cls}" ${clickable ? `data-key="${step.key}" role="button"` : ''}>
-            <span class="ps-dot">${rec ? '✓' : i + 1}</span>
+            <span class="ps-dot">${rec ? '✓' : partial ? '◐' : i + 1}</span>
             <span class="ps-text">${step.icon} ${step.label}${extra ? `<small>${extra}</small>` : ''}</span>
           </div>`;
         }).join('');
         const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
         const todayISO = today.toISOString().slice(0, 10);
-        const disb = st.ps.disbursed;
-        const disbForm = (canEdit && st.ps.docs && !disb) ? `
+        const suggest = di.amount ? Math.round(di.balance || di.amount) : '';
+        const disbForm = (canEdit && st.ps.docs && !di.full) ? `
           <div class="ps-disburse">
-            <div class="sc-label">Record disbursement</div>
+            <div class="sc-label">${di.list.length ? 'Record next release' : 'Record disbursement'}${di.amount ? ' · balance ' + inr(di.balance || di.amount) : ''}</div>
             <div class="ps-form">
-              <input type="number" id="disbAmount" min="1" placeholder="Amount (₹)" value="${t.amount ? Math.round(t.amount) : ''}">
+              <input type="number" id="disbAmount" min="1" placeholder="Amount (₹)" value="${suggest}">
               <input type="date" id="disbDate" value="${todayISO}" max="${todayISO}">
             </div>
-            <button class="btn-primary btn-sm" id="disbBtn" style="width:100%; margin-top:6px;">💸 Mark as disbursed</button>
+            <label class="ps-final"><input type="checkbox" id="disbFinal"> This is the final release (close even if a balance remains)</label>
+            <button class="btn-primary btn-sm" id="disbBtn" style="width:100%; margin-top:6px;">💸 Record release</button>
           </div>` : '';
+        const releaseRows = di.list.length ? `
+          <div class="sc-phase-title" style="margin-top:12px;">Disbursement <b>${di.amount ? Math.min(100, Math.round(di.total / di.amount * 100)) + '%' : ''}</b></div>
+          <div class="sc-rows">
+            ${di.list.map((r, i) => `<div class="detail-row"><span>Release ${i + 1} · ${escapeHtml(fmtDateShort(r.date))}</span><span>${inr(Number(r.amount) || 0)}</span></div>`).join('')}
+            <div class="detail-row"><span><b>Total disbursed</b></span><span><b>${inr(di.total)}</b></span></div>
+            ${di.amount ? `<div class="detail-row"><span>Balance to disburse</span><span>${di.balance > 1 ? inr(di.balance) : '₹0'}${di.closed && di.balance > 1 ? ' (file closed)' : ''}</span></div>` : ''}
+          </div>` : '';
+        const badge = di.full ? (di.balance > 1 ? 'PART DISBURSED' : 'DISBURSED') : di.list.length ? 'DISBURSING' : 'SANCTIONED';
         return `
           <div class="sanction-card">
-            <div class="sc-head"><span>💎 Sanction Card</span><span class="sc-badge">${st.done === st.total ? ((st.ps.disbursed && st.ps.disbursed.amount && t.amount && st.ps.disbursed.amount < t.amount - 1) ? 'PART DISBURSED' : 'DISBURSED') : 'SANCTIONED'}</span></div>
+            <div class="sc-head"><span>💎 Sanction Card</span><span class="sc-badge">${badge}</span></div>
             ${missing ? `<div class="sc-warn">Some sanction terms are not recorded yet, so figures may be incomplete.</div>` : ''}
             <div class="sc-grid">
               ${tile('Sanction amount', t.amount ? inr(t.amount) : '—')}
@@ -6996,6 +7042,8 @@
             </div>
             <div class="sc-rows">
               ${t.emi ? `<div class="detail-row"><span>Total interest</span><span>${inr(t.totalInterest)}</span></div><div class="detail-row"><span>Total payable</span><span>${inr(t.totalPayable)}</span></div>` : ''}
+              ${t.banker ? `<div class="detail-row"><span>Lender</span><span>${escapeHtml(t.banker)}</span></div>` : ''}
+              ${t.ref ? `<div class="detail-row"><span>Sanction ref.</span><span>${escapeHtml(t.ref)}</span></div>` : ''}
               ${t.date ? `<div class="detail-row"><span>Sanctioned on</span><span>${escapeHtml(fmtDateShort(t.date))}${t.by ? ' · ' + escapeHtml(t.by) : ''}</span></div>` : ''}
               ${t.fees ? `<div class="detail-row"><span>Fees</span><span>${escapeHtml(t.fees)}</span></div>` : ''}
               ${t.conditions ? `<div class="detail-row"><span>Conditions</span><span>${escapeHtml(t.conditions)}</span></div>` : ''}
@@ -7004,28 +7052,39 @@
             <div class="sc-bar"><i style="width:${Math.round(st.done / st.total * 100)}%"></i></div>
             <div class="ps-steps">${steps}</div>
             ${disbForm}
-            ${disb && disb.amount ? `<div class="sc-rows" style="margin-top:8px;"><div class="detail-row"><span>Disbursed</span><span>${inr(disb.amount)} · ${escapeHtml(fmtDateShort(disb.date))}</span></div>${t.amount && disb.amount < t.amount - 1 ? `<div class="detail-row"><span>Balance to disburse</span><span>${inr(t.amount - disb.amount)}</span></div>` : ''}</div>` : ''}
-            ${canEdit ? '<div class="sc-hint">Tap a step to mark it done. Tap the last done step again to undo it.</div>' : ''}
+            ${releaseRows}
+            ${canEdit ? '<div class="sc-hint">Tap a step to mark it done. Tap the last done step again to undo it (for disbursement, this removes the latest release).</div>' : ''}
             <button class="btn-secondary btn-sm" id="shareSanctionBtn" style="width:100%; margin-top:8px;">📤 Share sanction details</button>
           </div>`;
       }
       function togglePostSanctionStep(lead, key) {
         if (!(currentRole === 'owner' || currentRole === 'business')) return;
         lead.borrower = lead.borrower || {};
-        const ps = lead.borrower.postSanction = Object.assign({}, lead.borrower.postSanction || {});
+        const ps = Object.assign({}, getPS(lead));
+        setPS(lead, ps);
         const idx = POST_SANCTION_STEPS.findIndex(x => x.key === key);
         if (idx < 0) return;
-        if (key === 'disbursed' && !ps[key]) return; // recorded with the disbursement form
-        if (ps[key]) {
+        if (key === 'disbursed') {
+          // remove the latest release (releases are added with the form)
+          const di = disbursementInfo(lead);
+          if (!di.list.length) return;
+          const last = di.list[di.list.length - 1];
+          if (!confirm('Remove the latest release of ₹' + (Number(last.amount) || 0).toLocaleString('en-IN') + '?')) return;
+          const list = di.list.slice(0, -1);
+          ps.disbursements = list;
+          delete ps.disbursed;
+          delete ps.disbursementClosed;
+          addFeed('↩️ Release removed — ' + lead.borrower.name);
+        } else if (ps[key]) {
           // undo only the latest done step, so the order stays valid
-          const later = POST_SANCTION_STEPS.slice(idx + 1).some(x => ps[x.key]);
-          if (later) { alert('Undo the later steps first.'); return; }
+          if (POST_SANCTION_STEPS.slice(idx + 1).some(x => stepDone(lead, x.key))) { alert('Undo the later steps first.'); return; }
           delete ps[key];
+          addFeed('↩️ ' + POST_SANCTION_STEPS[idx].label + ' — ' + lead.borrower.name);
         } else {
-          if (idx > 0 && !ps[POST_SANCTION_STEPS[idx - 1].key]) { alert('Complete the earlier step first.'); return; }
+          if (idx > 0 && !stepDone(lead, POST_SANCTION_STEPS[idx - 1].key)) { alert('Complete the earlier step first.'); return; }
           ps[key] = { date: new Date().toISOString(), by: (currentUserData && currentUserData.name) || currentUser || '' };
+          addFeed('✅ ' + POST_SANCTION_STEPS[idx].label + ' — ' + lead.borrower.name);
         }
-        addFeed((ps[key] ? '✅ ' : '↩️ ') + POST_SANCTION_STEPS[idx].label + ' — ' + lead.borrower.name);
         persistAll();
         renderPipeline();
         showDetail(lead);
@@ -7034,17 +7093,23 @@
         if (!(currentRole === 'owner' || currentRole === 'business')) return;
         const amount = Math.round(Number(document.getElementById('disbAmount')?.value) || 0);
         const dateStr = document.getElementById('disbDate')?.value || '';
-        if (!(amount > 0)) { alert('Enter the disbursed amount.'); return; }
-        if (!dateStr) { alert('Choose the disbursement date.'); return; }
+        const isFinal = !!document.getElementById('disbFinal')?.checked;
+        if (!(amount > 0)) { alert('Enter the amount released.'); return; }
+        if (!dateStr) { alert('Choose the release date.'); return; }
         const when = new Date(dateStr + 'T12:00:00');
-        if (isNaN(when) || when > new Date()) { alert('The disbursement date cannot be in the future.'); return; }
-        const t = getSanctionTerms(lead);
-        if (t.amount && amount > t.amount + 1 && !confirm('This is more than the sanctioned amount (₹' + Math.round(t.amount).toLocaleString('en-IN') + '). Continue?')) return;
+        if (isNaN(when) || when > new Date()) { alert('The release date cannot be in the future.'); return; }
         lead.borrower = lead.borrower || {};
-        const ps = lead.borrower.postSanction = Object.assign({}, lead.borrower.postSanction || {});
-        if (!ps.docs) { alert('Complete the agreement and documentation step first.'); return; }
-        ps.disbursed = { date: when.toISOString(), amount, by: (currentUserData && currentUserData.name) || currentUser || '' };
-        addFeed('💸 Disbursed ₹' + amount.toLocaleString('en-IN') + ' — ' + lead.borrower.name);
+        const before = disbursementInfo(lead);
+        const ps0 = getPS(lead);
+        if (!ps0.docs) { alert('Complete the agreement and documentation step first.'); return; }
+        if (before.amount && before.total + amount > before.amount + 1 &&
+            !confirm('Total released would be ₹' + (before.total + amount).toLocaleString('en-IN') + ', more than the sanctioned ₹' + Math.round(before.amount).toLocaleString('en-IN') + '. Continue?')) return;
+        const ps = Object.assign({}, ps0);
+        setPS(lead, ps);
+        ps.disbursements = before.list.concat([{ date: when.toISOString(), amount, by: (currentUserData && currentUserData.name) || currentUser || '' }]);
+        delete ps.disbursed;
+        if (isFinal) ps.disbursementClosed = { date: new Date().toISOString(), by: (currentUserData && currentUserData.name) || currentUser || '' };
+        addFeed('💸 Released ₹' + amount.toLocaleString('en-IN') + ' — ' + lead.borrower.name);
         persistAll();
         renderPipeline();
         showDetail(lead);
@@ -7054,7 +7119,9 @@
         const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
         const text = ['💎 Loan sanction – ' + lead.borrower.name, 'Sanction amount: ' + (t.amount ? inr(t.amount) : '—'),
           'Term: ' + (t.months ? t.months + ' months' : '—'), 'Rate of interest: ' + (t.roi ? t.roi + '% p.a.' : '—'),
-          'EMI: ' + (t.emi ? inr(t.emi) + ' per month' : '—'), '', 'Solitaire Finz Mart'].join('\n');
+          'EMI: ' + (t.emi ? inr(t.emi) + ' per month' : '—')]
+          .concat(disbursementInfo(lead).list.length ? ['Disbursed so far: ' + inr(disbursementInfo(lead).total) + (disbursementInfo(lead).amount ? ' (balance ' + inr(disbursementInfo(lead).balance) + ')' : '')] : [])
+          .concat(['', 'Solitaire Finz Mart']).join('\n');
         try {
           if (navigator.share) { await navigator.share({ title: 'Loan sanction', text }); return; }
         } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -8048,6 +8115,7 @@
         }
         if (kind === 'band') return { excellent: 'green', good: 'blue', fair: 'amber', poor: 'red' }[t] || null;
         if (kind === 'channel') return t === 'bank' ? 'blue' : t === 'nbfc' ? 'copper' : null;
+        if (kind === 'disb') return { 'complete': 'green', 'in progress': 'blue', 'part (closed)': 'copper', 'not started': 'grey' }[t] || null;
         return null;
       }
       const xlFill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
@@ -8233,6 +8301,10 @@
               v = (v === '' || v === undefined || v === null) ? null : Number(v);
               cell.alignment = { vertical: 'middle', horizontal: 'center' };
               if (t === 'score') cell.font = xlFont(10, true, XL.text);
+            } else if (t === 'dec') {
+              v = (v === '' || v === undefined || v === null) ? null : Number(v);
+              cell.numFmt = '0.00';
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
             } else if (t === 'date') {
               cell.numFmt = 'dd-mmm-yyyy';
               cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -8628,6 +8700,34 @@
         next = dtable(next, 'By loan type', H5('Loan type', 'Share'), breakdown('Loan Type', typeR, typeKeys, null), 'C');
         next = dtable(next, 'By channel', H5('Channel', 'Share'), breakdown('Channel', chanR, chanKeys, 'channel'), 'C');
 
+        // Post-sanction progress (from the Post-sanction sheet)
+        const P = sheets.find(s => s.name === 'Post-sanction');
+        if (P && P.rows.length) {
+          const idP = rng(P, 'Lead ID'), amtP = rng(P, 'Sanction Amount (₹)'), disbP = rng(P, 'Total Disbursed (₹)');
+          const stepDefs = [['Sanctioned leads', null, null], ['Letter issued', 'Letter Issued', 'Yes'], ['Customer accepted', 'Customer Accepted', 'Yes'],
+            ['Documentation done', 'Documentation Done', 'Yes'], ['Disbursing', 'Disbursement Status', 'In progress'],
+            ['Fully disbursed', 'Disbursement Status', 'Complete'], ['Part disbursed (closed)', 'Disbursement Status', 'Part (closed)']];
+          next = dtable(next, 'Post-sanction progress', ['Step', 'Leads', 'Share', 'Sanction value', 'Disbursed'], r0 => {
+            const sel = d => P.rows.filter(x => !d[1] || String(x[d[1]]) === d[2]);
+            const rows = stepDefs.map((d, i) => {
+              const r = r0 + i, m = sel(d);
+              const cnt2 = m.length, san = sum(m.map(x => Number(x['Sanction Amount (₹)']) || 0)), dis = sum(m.map(x => Number(x['Total Disbursed (₹)']) || 0));
+              const crit = d[1] ? rng(P, d[1]) : null;
+              return [
+                { v: d[0], bold: true },
+                { v: F(crit ? 'COUNTIF(' + crit + ',"' + d[2] + '")' : 'COUNTA(' + idP + ')', cnt2), a: 'c', bold: true },
+                { v: F('IFERROR(C' + r + '/$C$' + r0 + ',0)', safe(cnt2, P.rows.length)), a: 'c', fmt: '0.0%' },
+                { v: F(crit ? 'SUMIF(' + crit + ',"' + d[2] + '",' + amtP + ')' : 'SUM(' + amtP + ')', san), a: 'r', fmt: XL_INR },
+                { v: F(crit ? 'SUMIF(' + crit + ',"' + d[2] + '",' + disbP + ')' : 'SUM(' + disbP + ')', dis), a: 'r', fmt: XL_INR }
+              ];
+            });
+            const totSan = sum(P.rows.map(x => Number(x['Sanction Amount (₹)']) || 0)), totDis = sum(P.rows.map(x => Number(x['Total Disbursed (₹)']) || 0));
+            return { rows, total: [
+              { v: 'BALANCE TO DISBURSE' }, { v: '' }, { v: '' }, { v: '' },
+              { v: F('E' + r0 + '-F' + r0, totSan - totDis), a: 'r', fmt: XL_INR }] };
+          }, 'C');
+        }
+
         // Business Associate performance: Leads | Approved | Conversion | Loan amount
         next = dtable(next, 'Business associate performance', ['Business associate', 'Leads', 'Approved', 'Conversion', 'Loan amount'], r0 => {
           const rows = baNames.map((k, i) => {
@@ -8791,6 +8891,8 @@
           ['Co-applicants', 'One row per co-applicant with income, debt and CIBIL'],
           ['Property & Loan', 'Property type and value, balance-transfer and top-up amounts, current bank'],
           ['Team & Status', 'Who is handling each lead in Legal, Technical and Credit, with status and submitted flags'],
+          ['Post-sanction', 'One row per sanctioned lead: terms, EMI, post-sanction steps, amount disbursed and balance'],
+          ['Disbursements', 'One row per release (part-disbursement) with running total and balance'],
           ['References', 'One row per reference given by the customer']
         ]);
         section('How numbers are worked out', [
@@ -8967,7 +9069,52 @@
           ]
         };
 
-        buildAndSave([leadsSheet, applicantSheet, coSheet, propertySheet, teamSheet, refSheet], 'Solitaire_Leads',
+        // Post-sanction sheets (sanctioned leads only)
+        const psLeads = list.filter(isSanctioned);
+        const yn = v => v ? 'Yes' : 'No';
+        const psRows = [], relRows = [];
+        psLeads.forEach(l => {
+          const t = getSanctionTerms(l), st = postSanctionState(l), di = st.disb;
+          const sanDate = t.date ? xlsxDate(t.date) : null;
+          const dStatus = di.full ? (di.balance > 1 ? 'Part (closed)' : 'Complete') : di.list.length ? 'In progress' : 'Not started';
+          psRows.push({
+            'Lead ID': l.id, 'Client Name': l.borrower.name, 'Lender': t.banker || l.institutionName || '', 'Sanction Date': sanDate,
+            'Sanction Amount (₹)': Math.round(t.amount), 'Term (months)': t.months || '', 'ROI (% p.a.)': t.roi || '', 'EMI (₹)': Math.round(t.emi),
+            'Letter Issued': yn(getPS(l).letter), 'Customer Accepted': yn(getPS(l).accepted), 'Documentation Done': yn(getPS(l).docs),
+            'Disbursement Status': dStatus, 'Total Disbursed (₹)': Math.round(di.total), 'Balance to Disburse (₹)': di.closed ? Math.round(di.balance) : Math.round(di.balance),
+            'Releases': di.list.length, 'Progress': st.done + '/' + st.total, 'File Closed': yn(di.closed)
+          });
+          let cum = 0;
+          di.list.forEach((r, i) => {
+            cum += Number(r.amount) || 0;
+            relRows.push({
+              'Lead ID': l.id, 'Client Name': l.borrower.name, 'Sanction Amount (₹)': Math.round(t.amount), 'Release #': i + 1,
+              'Release Date': xlsxDate(r.date), 'Release Amount (₹)': Number(r.amount) || 0, 'Recorded By': r.by || '',
+              'Cumulative Disbursed (₹)': cum, 'Balance After (₹)': t.amount ? Math.max(0, Math.round(t.amount - cum)) : ''
+            });
+          });
+        });
+        const postSheet = {
+          name: 'Post-sanction', title: 'Post-sanction Tracker', tab: 'FFC9A84C',
+          totals: ['Sanction Amount (₹)', 'Total Disbursed (₹)', 'Balance to Disburse (₹)'], rows: psRows,
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Lender', w: 22 }, { h: 'Sanction Date', w: 14, t: 'date' },
+            { h: 'Sanction Amount (₹)', w: 20, t: 'inr', bar: true }, { h: 'Term (months)', w: 12, t: 'int' }, { h: 'ROI (% p.a.)', w: 12, t: 'dec' },
+            { h: 'EMI (₹)', w: 16, t: 'inr' }, { h: 'Letter Issued', w: 13, t: 'tone:status' }, { h: 'Customer Accepted', w: 16, t: 'tone:status' },
+            { h: 'Documentation Done', w: 17, t: 'tone:status' }, { h: 'Disbursement Status', w: 18, t: 'tone:disb' },
+            { h: 'Total Disbursed (₹)', w: 20, t: 'inr' }, { h: 'Balance to Disburse (₹)', w: 22, t: 'inr' }, { h: 'Releases', w: 10, t: 'int' },
+            { h: 'Progress', w: 10, t: 'center' }, { h: 'File Closed', w: 12, t: 'tone:status' }
+          ]
+        };
+        const releaseSheet = {
+          name: 'Disbursements', title: 'Disbursement Releases', tab: 'FF4FB286', totals: ['Release Amount (₹)'], rows: relRows,
+          cols: [
+            { h: 'Lead ID', w: 10, t: 'id' }, { h: 'Client Name', w: 26 }, { h: 'Sanction Amount (₹)', w: 20, t: 'inr' }, { h: 'Release #', w: 11, t: 'int' },
+            { h: 'Release Date', w: 14, t: 'date' }, { h: 'Release Amount (₹)', w: 20, t: 'inr', bar: true }, { h: 'Recorded By', w: 22 },
+            { h: 'Cumulative Disbursed (₹)', w: 24, t: 'inr' }, { h: 'Balance After (₹)', w: 20, t: 'inr' }
+          ]
+        };
+        buildAndSave([leadsSheet, applicantSheet, coSheet, propertySheet, teamSheet, postSheet, releaseSheet, refSheet], 'Solitaire_Leads',
           'Spreadsheet ready (' + list.length + ' leads).', { dashboard: true });
       });
 
