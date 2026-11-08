@@ -2442,6 +2442,53 @@
       padding: 14px 16px; margin-bottom: 14px;
     }
     .kyc-request-banner { border-radius: 18px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); margin-bottom: 14px; }
+
+    /* ===== SANCTION CARD (post-sanction phase) ===== */
+    .sanction-card {
+      margin-top: 12px; padding: 14px; border-radius: 18px;
+      background: linear-gradient(160deg, #26231a 0%, #1a1812 100%);
+      border: 1px solid rgba(201, 168, 76, 0.4);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.1);
+    }
+    .sc-head { display: flex; justify-content: space-between; align-items: center; color: #e6c566; font-weight: 600; font-size: 14px; margin-bottom: 10px; }
+    .sc-badge { font-size: 9px; letter-spacing: 1.2px; padding: 3px 9px; border-radius: 10px; color: #14141e; background: linear-gradient(135deg, #e6c566, #c9a84c); font-weight: 700; }
+    .sc-warn { font-size: 11px; color: #d4a86a; background: rgba(212, 168, 106, 0.1); border: 1px solid rgba(212, 168, 106, 0.3); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+    .sc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .sc-tile { background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(201, 168, 76, 0.18); border-radius: 12px; padding: 10px 12px; }
+    .sc-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #a89b7a; }
+    .sc-value { font-size: 17px; font-weight: 700; color: #f0e6d0; margin-top: 3px; }
+    .sc-sub { font-size: 10px; color: #8a7f66; margin-top: 2px; }
+    .sc-rows { margin-bottom: 4px; }
+    .sc-phase-title { margin-top: 12px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #c9a84c; display: flex; justify-content: space-between; }
+    .sc-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin: 6px 0 10px; overflow: hidden; }
+    .sc-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c9a84c, #4fb286); border-radius: 3px; transition: width 0.3s; }
+    .ps-steps { display: flex; flex-direction: column; gap: 6px; }
+    .ps-step { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; font-size: 12.5px; color: #c8bca8;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(201, 168, 76, 0.12); }
+    .ps-step[data-key] { cursor: pointer; }
+    .ps-dot { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; background: #2a2a3a; color: #a89b7a; border: 1px solid rgba(201, 168, 76, 0.25); }
+    .ps-text small { display: block; font-size: 10px; color: #8a7f66; margin-top: 2px; }
+    .ps-step.done { border-color: rgba(79, 178, 134, 0.45); background: rgba(79, 178, 134, 0.08); color: #d7f0e1; }
+    .ps-step.done .ps-dot { background: #4fb286; color: #0f1f17; border-color: #4fb286; }
+    .ps-step.next { border-color: rgba(201, 168, 76, 0.5); }
+    .ps-step.next .ps-dot { background: rgba(201, 168, 76, 0.2); color: #e6c566; }
+    .ps-step.wait { opacity: 0.55; }
+    .sc-hint { font-size: 10px; color: #6a5f48; margin-top: 8px; text-align: center; }
+
+    /* ===== POST-SANCTION: disbursement form and tracker list ===== */
+    .ps-disburse { margin-top: 10px; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(201, 168, 76, 0.2); }
+    .ps-form { display: grid; grid-template-columns: 1.2fr 1fr; gap: 6px; margin-top: 6px; }
+    .ps-form input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 13px; color: #f0e6d0; background: #12121c; border: 1px solid rgba(201, 168, 76, 0.25); border-radius: 10px; }
+    .pt-row { padding: 12px 14px; margin-bottom: 10px; cursor: pointer; border-radius: 16px;
+      background: linear-gradient(160deg, #202030 0%, #181825 100%); border: 1px solid rgba(201, 168, 76, 0.14);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); transition: 0.2s; }
+    .pt-row:hover, .pt-row:active { border-color: #c9a84c; }
+    .pt-top { display: flex; justify-content: space-between; gap: 8px; color: #f0e6d0; }
+    .pt-top span { color: #e6c566; font-weight: 700; }
+    .pt-meta { font-size: 11px; color: #a89b7a; margin-top: 3px; }
+    .pt-next { display: flex; justify-content: space-between; font-size: 11px; color: #8ab4d6; }
+    .pt-next b { color: #e6c566; }
   </style>
 <script>
 (function () {
@@ -3656,6 +3703,15 @@
             <span style="font-size:11px; background:#1a1a2a; padding:4px 14px; border-radius:30px; color:#a89b7a; border:1px solid rgba(255,215,0,0.08);">6 stages</span>
             <span id="roleIndicator" style="font-size:10px; background:#2a2a3e; padding:2px 10px; border-radius:12px; color:#6a5f48;"></span>
           </div>
+        </div>
+        <div class="seg" id="pipelineViewSwitch" style="margin-bottom:10px;">
+          <button data-view="all" class="on">All leads</button>
+          <button data-view="post">💎 Post-sanction <span id="postSanctionCount"></span></button>
+        </div>
+        <div class="seg" id="postSortSwitch" style="display:none; margin-bottom:10px;">
+          <button data-sort="action" class="on">Needs action</button>
+          <button data-sort="done">Most progressed</button>
+          <button data-sort="amount">Amount</button>
         </div>
         <div class="live-feed" id="liveFeed"><div class="feed-item"><i class="fas fa-info-circle"></i> No activity yet</div></div>
         <div id="pipelineList"></div>
@@ -6154,6 +6210,30 @@
       // ================================================================
       // 15. PIPELINE RENDER
       // ================================================================
+      let pipelineView = 'all', postSort = 'action';
+      function postSanctionListHtml(list) {
+        if (!list.length) return '<div style="color:#6a5f48; text-align:center; padding:20px;">No sanctioned leads yet.</div>';
+        const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+        const rows = list.map(l => ({ l, t: getSanctionTerms(l), st: postSanctionState(l) }));
+        const finished = r => r.st.done === r.st.total;
+        rows.sort((a, b) => {
+          if (postSort === 'amount') return b.t.amount - a.t.amount;
+          if (postSort === 'done') return b.st.done - a.st.done || b.t.amount - a.t.amount;
+          // needs action first: unfinished before finished, least progress first, oldest sanction first
+          return (finished(a) - finished(b)) || (a.st.done - b.st.done) || (new Date(a.t.date || 0) - new Date(b.t.date || 0));
+        });
+        return rows.map(({ l, t, st }) => {
+          const next = POST_SANCTION_STEPS.find(x => !st.ps[x.key]);
+          const nextTxt = next ? 'Next: ' + next.icon + ' ' + next.label
+            : '✅ Disbursed' + (st.ps.disbursed && st.ps.disbursed.amount ? ' ' + inr(st.ps.disbursed.amount) + ' on ' + fmtDateShort(st.ps.disbursed.date) : '');
+          return `<div class="pt-row" data-id="${escapeHtml(l.id)}">
+            <div class="pt-top"><strong>${escapeHtml(l.borrower.name)}</strong><span>${t.amount ? inr(t.amount) : '—'}</span></div>
+            <div class="pt-meta">${t.emi ? 'EMI ' + inr(t.emi) + ' · ' : ''}${t.months ? t.months + ' months' : ''}${t.roi ? ' @ ' + t.roi + '%' : ''}${t.date ? ' · sanctioned ' + escapeHtml(fmtDateShort(t.date)) : ''}</div>
+            <div class="sc-bar"><i style="width:${Math.round(st.done / st.total * 100)}%"></i></div>
+            <div class="pt-next"><span>${nextTxt}</span><b>${st.done}/${st.total}</b></div>
+          </div>`;
+        }).join('');
+      }
       function renderPipeline() {
         const pipelineList = document.getElementById('pipelineList');
         const leadCount = document.getElementById('leadCount');
@@ -6172,6 +6252,16 @@
         } else filteredLeads = leads;
 
         if (leadCount) leadCount.textContent = filteredLeads.length;
+        const sanctionedLeads = filteredLeads.filter(isSanctioned);
+        const psCountEl = document.getElementById('postSanctionCount');
+        if (psCountEl) psCountEl.textContent = sanctionedLeads.length ? '(' + sanctionedLeads.length + ')' : '';
+        document.querySelectorAll('#pipelineViewSwitch button').forEach(b => b.classList.toggle('on', b.dataset.view === pipelineView));
+        const sortSw = document.getElementById('postSortSwitch');
+        if (sortSw) {
+          sortSw.style.display = pipelineView === 'post' ? 'flex' : 'none';
+          sortSw.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.sort === postSort));
+        }
+        if (pipelineView === 'post') { pipelineList.innerHTML = postSanctionListHtml(sanctionedLeads); return; }
 
         if (filteredLeads.length === 0) {
           pipelineList.innerHTML =
@@ -6227,6 +6317,7 @@
                 ${reportBadge('📋 Tech report:', technicalReport)}
                 ${reportBadge('📋 Credit report:', creditReport)}
                 ${sanction ? `<div style="font-size:9px; color:#c9a84c; margin-top:2px;">💎 Sanctioned ₹${(sanction.sanction_amount || 0).toLocaleString('en-IN')} · ${escapeHtml(sanction.status || 'sanctioned')}${sanction.sanction_date ? ' · ' + escapeHtml(sanction.sanction_date) : ''}</div>` : ''}
+                ${isSanctioned(lead) ? (() => { const t = getSanctionTerms(lead), ps = postSanctionState(lead); return t.emi ? `<div style="font-size:9px; color:#8ab4d6; margin-top:2px;">EMI ₹${Math.round(t.emi).toLocaleString('en-IN')} · ${t.months}m @ ${t.roi}% · Post-sanction ${ps.done}/${ps.total}</div>` : `<div style="font-size:9px; color:#8ab4d6; margin-top:2px;">Post-sanction ${ps.done}/${ps.total}</div>`; })() : ''}
               </div>
               <div style="text-align:right;">
                 <span class="badge ${badgeClass}" style="font-size:10px;">${escapeHtml(stage)}</span>
@@ -6818,6 +6909,159 @@
       // ================================================================
       // 18. SHOW DETAIL / EDIT LEAD
       // ================================================================
+      // ================================================================
+      // POST-SANCTION PHASE: sanction card (amount, term, ROI, EMI) + progress after sanction
+      // ================================================================
+      const POST_SANCTION_STEPS = [
+        { key: 'letter', icon: '📄', label: 'Sanction letter issued' },
+        { key: 'accepted', icon: '✍️', label: 'Customer accepted terms' },
+        { key: 'docs', icon: '📑', label: 'Agreement & documentation done' },
+        { key: 'disbursed', icon: '💸', label: 'Loan disbursed' }
+      ];
+      function isSanctioned(lead) {
+        return !!getSanctionForLead(lead.id) || lead.stage === 'Approved' || String(lead.adminStatus || '').toLowerCase() === 'approved';
+      }
+      function emiFor(principal, annualRoi, months) {
+        const P = Number(principal) || 0, n = Math.round(Number(months) || 0), r = (Number(annualRoi) || 0) / 1200;
+        if (!(P > 0) || !(n > 0)) return 0;
+        if (r === 0) return P / n;
+        const f = Math.pow(1 + r, n);
+        return P * r * f / (f - 1);
+      }
+      function getSanctionTerms(lead) {
+        const sn = getSanctionForLead(lead.id) || {};
+        const pick = (...vals) => { for (const v of vals) { const x = Number(v); if (x > 0) return x; } return 0; };
+        const amount = pick(sn.sanction_amount, lead.creditLoanAmount);
+        const months = pick(sn.tenure_months, sn.term_months, sn.tenure, sn.loan_tenure_months, lead.creditTermMonths);
+        const roi = pick(sn.roi, sn.interest_rate, sn.rate_of_interest, lead.creditROI);
+        const emi = pick(sn.emi) || emiFor(amount, roi, months);
+        return {
+          amount, months, roi, emi,
+          totalPayable: emi * months, totalInterest: Math.max(0, emi * months - amount),
+          date: sn.sanction_date || sn.created_at || lead.approvedAt || null,
+          by: sn.approved_by || lead.approvedBy || '',
+          fees: lead.creditFees || '', conditions: lead.creditConditions || ''
+        };
+      }
+      function postSanctionState(lead) {
+        const ps = (lead.borrower && lead.borrower.postSanction) || {};
+        const done = POST_SANCTION_STEPS.filter(st => ps[st.key]).length;
+        return { ps, done, total: POST_SANCTION_STEPS.length };
+      }
+      const fmtDateShort = d => {
+        const dt = new Date(d);
+        return isNaN(dt) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      };
+      function sanctionCardHtml(lead) {
+        if (!isSanctioned(lead)) return '';
+        const t = getSanctionTerms(lead), st = postSanctionState(lead);
+        const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+        const years = t.months ? (t.months / 12).toFixed(1).replace(/\.0$/, '') : '';
+        const canEdit = currentRole === 'owner' || currentRole === 'business';
+        const missing = !(t.amount && t.months && t.roi);
+        const tile = (label, value, sub) => `<div class="sc-tile"><div class="sc-label">${label}</div><div class="sc-value">${value}</div>${sub ? `<div class="sc-sub">${sub}</div>` : ''}</div>`;
+        const steps = POST_SANCTION_STEPS.map((step, i) => {
+          const rec = st.ps[step.key];
+          const prevDone = i === 0 || st.ps[POST_SANCTION_STEPS[i - 1].key];
+          const cls = rec ? 'done' : prevDone ? 'next' : 'wait';
+          // the last step is recorded through the disbursement form below (amount + date)
+          const clickable = canEdit && (rec || step.key !== 'disbursed');
+          const extra = rec ? [step.key === 'disbursed' && rec.amount ? inr(rec.amount) : '', fmtDateShort(rec.date), rec.by || ''].filter(Boolean).map(escapeHtml).join(' · ') : '';
+          return `<div class="ps-step ${cls}" ${clickable ? `data-key="${step.key}" role="button"` : ''}>
+            <span class="ps-dot">${rec ? '✓' : i + 1}</span>
+            <span class="ps-text">${step.icon} ${step.label}${extra ? `<small>${extra}</small>` : ''}</span>
+          </div>`;
+        }).join('');
+        const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+        const todayISO = today.toISOString().slice(0, 10);
+        const disb = st.ps.disbursed;
+        const disbForm = (canEdit && st.ps.docs && !disb) ? `
+          <div class="ps-disburse">
+            <div class="sc-label">Record disbursement</div>
+            <div class="ps-form">
+              <input type="number" id="disbAmount" min="1" placeholder="Amount (₹)" value="${t.amount ? Math.round(t.amount) : ''}">
+              <input type="date" id="disbDate" value="${todayISO}" max="${todayISO}">
+            </div>
+            <button class="btn-primary btn-sm" id="disbBtn" style="width:100%; margin-top:6px;">💸 Mark as disbursed</button>
+          </div>` : '';
+        return `
+          <div class="sanction-card">
+            <div class="sc-head"><span>💎 Sanction Card</span><span class="sc-badge">${st.done === st.total ? ((st.ps.disbursed && st.ps.disbursed.amount && t.amount && st.ps.disbursed.amount < t.amount - 1) ? 'PART DISBURSED' : 'DISBURSED') : 'SANCTIONED'}</span></div>
+            ${missing ? `<div class="sc-warn">Some sanction terms are not recorded yet, so figures may be incomplete.</div>` : ''}
+            <div class="sc-grid">
+              ${tile('Sanction amount', t.amount ? inr(t.amount) : '—')}
+              ${tile('Monthly EMI', t.emi ? inr(t.emi) : '—', t.roi && t.months ? 'on reducing balance' : '')}
+              ${tile('Term', t.months ? t.months + ' months' : '—', years ? years + ' years' : '')}
+              ${tile('Rate of interest', t.roi ? t.roi + '% p.a.' : '—')}
+            </div>
+            <div class="sc-rows">
+              ${t.emi ? `<div class="detail-row"><span>Total interest</span><span>${inr(t.totalInterest)}</span></div><div class="detail-row"><span>Total payable</span><span>${inr(t.totalPayable)}</span></div>` : ''}
+              ${t.date ? `<div class="detail-row"><span>Sanctioned on</span><span>${escapeHtml(fmtDateShort(t.date))}${t.by ? ' · ' + escapeHtml(t.by) : ''}</span></div>` : ''}
+              ${t.fees ? `<div class="detail-row"><span>Fees</span><span>${escapeHtml(t.fees)}</span></div>` : ''}
+              ${t.conditions ? `<div class="detail-row"><span>Conditions</span><span>${escapeHtml(t.conditions)}</span></div>` : ''}
+            </div>
+            <div class="sc-phase-title">Post-sanction progress <b>${st.done}/${st.total}</b></div>
+            <div class="sc-bar"><i style="width:${Math.round(st.done / st.total * 100)}%"></i></div>
+            <div class="ps-steps">${steps}</div>
+            ${disbForm}
+            ${disb && disb.amount ? `<div class="sc-rows" style="margin-top:8px;"><div class="detail-row"><span>Disbursed</span><span>${inr(disb.amount)} · ${escapeHtml(fmtDateShort(disb.date))}</span></div>${t.amount && disb.amount < t.amount - 1 ? `<div class="detail-row"><span>Balance to disburse</span><span>${inr(t.amount - disb.amount)}</span></div>` : ''}</div>` : ''}
+            ${canEdit ? '<div class="sc-hint">Tap a step to mark it done. Tap the last done step again to undo it.</div>' : ''}
+            <button class="btn-secondary btn-sm" id="shareSanctionBtn" style="width:100%; margin-top:8px;">📤 Share sanction details</button>
+          </div>`;
+      }
+      function togglePostSanctionStep(lead, key) {
+        if (!(currentRole === 'owner' || currentRole === 'business')) return;
+        lead.borrower = lead.borrower || {};
+        const ps = lead.borrower.postSanction = Object.assign({}, lead.borrower.postSanction || {});
+        const idx = POST_SANCTION_STEPS.findIndex(x => x.key === key);
+        if (idx < 0) return;
+        if (key === 'disbursed' && !ps[key]) return; // recorded with the disbursement form
+        if (ps[key]) {
+          // undo only the latest done step, so the order stays valid
+          const later = POST_SANCTION_STEPS.slice(idx + 1).some(x => ps[x.key]);
+          if (later) { alert('Undo the later steps first.'); return; }
+          delete ps[key];
+        } else {
+          if (idx > 0 && !ps[POST_SANCTION_STEPS[idx - 1].key]) { alert('Complete the earlier step first.'); return; }
+          ps[key] = { date: new Date().toISOString(), by: (currentUserData && currentUserData.name) || currentUser || '' };
+        }
+        addFeed((ps[key] ? '✅ ' : '↩️ ') + POST_SANCTION_STEPS[idx].label + ' — ' + lead.borrower.name);
+        persistAll();
+        renderPipeline();
+        showDetail(lead);
+      }
+      function markDisbursed(lead) {
+        if (!(currentRole === 'owner' || currentRole === 'business')) return;
+        const amount = Math.round(Number(document.getElementById('disbAmount')?.value) || 0);
+        const dateStr = document.getElementById('disbDate')?.value || '';
+        if (!(amount > 0)) { alert('Enter the disbursed amount.'); return; }
+        if (!dateStr) { alert('Choose the disbursement date.'); return; }
+        const when = new Date(dateStr + 'T12:00:00');
+        if (isNaN(when) || when > new Date()) { alert('The disbursement date cannot be in the future.'); return; }
+        const t = getSanctionTerms(lead);
+        if (t.amount && amount > t.amount + 1 && !confirm('This is more than the sanctioned amount (₹' + Math.round(t.amount).toLocaleString('en-IN') + '). Continue?')) return;
+        lead.borrower = lead.borrower || {};
+        const ps = lead.borrower.postSanction = Object.assign({}, lead.borrower.postSanction || {});
+        if (!ps.docs) { alert('Complete the agreement and documentation step first.'); return; }
+        ps.disbursed = { date: when.toISOString(), amount, by: (currentUserData && currentUserData.name) || currentUser || '' };
+        addFeed('💸 Disbursed ₹' + amount.toLocaleString('en-IN') + ' — ' + lead.borrower.name);
+        persistAll();
+        renderPipeline();
+        showDetail(lead);
+      }
+      async function shareSanctionDetails(lead) {
+        const t = getSanctionTerms(lead);
+        const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+        const text = ['💎 Loan sanction – ' + lead.borrower.name, 'Sanction amount: ' + (t.amount ? inr(t.amount) : '—'),
+          'Term: ' + (t.months ? t.months + ' months' : '—'), 'Rate of interest: ' + (t.roi ? t.roi + '% p.a.' : '—'),
+          'EMI: ' + (t.emi ? inr(t.emi) + ' per month' : '—'), '', 'Solitaire Finz Mart'].join('\n');
+        try {
+          if (navigator.share) { await navigator.share({ title: 'Loan sanction', text }); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+        try { await navigator.clipboard.writeText(text); alert('Sanction details copied. Paste them into WhatsApp or SMS.'); }
+        catch (e) { prompt('Copy the sanction details:', text); }
+      }
+
       function showDetail(lead) {
         const detailView = document.getElementById('detailView');
         updateSimulatorLead(lead);
@@ -6871,6 +7115,7 @@
               <div class="detail-row"><span>Value</span><span>₹${(lead.property.value/100000).toFixed(1)}L</span></div>
             </div>
           ` : ''}
+          ${sanctionCardHtml(lead)}
           <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn-secondary btn-sm" id="refreshDetailBtn">🔄 Refresh</button>
             <button class="btn-success btn-sm" id="shareFromDetail">📤 Share</button>
@@ -6893,6 +7138,9 @@
         `;
 
         document.getElementById('refreshDetailBtn')?.addEventListener('click', function() { location.reload(); });
+        detailView.querySelectorAll('.ps-step[data-key]').forEach(el => el.addEventListener('click', () => togglePostSanctionStep(lead, el.dataset.key)));
+        document.getElementById('shareSanctionBtn')?.addEventListener('click', () => shareSanctionDetails(lead));
+        document.getElementById('disbBtn')?.addEventListener('click', () => markDisbursed(lead));
         document.getElementById('shareFromDetail')?.addEventListener('click', function() { openShare(lead); });
         document.getElementById('bankTemplateFromDetail')?.addEventListener('click', function() { openBankTemplate(
           lead); });
@@ -9004,6 +9252,22 @@
         }, 120);
       }
 
+      document.getElementById('pipelineViewSwitch')?.addEventListener('click', e => {
+        const b = e.target.closest('button[data-view]');
+        if (!b) return;
+        pipelineView = b.dataset.view;
+        renderPipeline();
+      });
+      document.getElementById('postSortSwitch')?.addEventListener('click', e => {
+        const b = e.target.closest('button[data-sort]');
+        if (!b) return;
+        postSort = b.dataset.sort;
+        renderPipeline();
+      });
+      document.getElementById('pipelineList')?.addEventListener('click', e => {
+        const row = e.target.closest('.pt-row');
+        if (row) openLeadFromSearch(row.dataset.id);
+      });
       document.getElementById('searchIcon')?.addEventListener('click', openLeadSearch);
       document.getElementById('searchCloseBtn')?.addEventListener('click', closeLeadSearch);
       document.getElementById('searchOverlay')?.addEventListener('click', e => { if (e.target.id === 'searchOverlay') closeLeadSearch(); });
