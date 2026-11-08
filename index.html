@@ -2417,6 +2417,31 @@
     html.compact-ui .pipeline-item::before { top: 10px; bottom: 10px; }
     html.compact-ui .form-group { margin-bottom: 10px; }
     html.compact-ui .card-title { padding-bottom: 6px; margin-bottom: 10px; }
+
+    /* ===== CAPTURE LEAD: every section is a themed panel (same look as the applicant details) ===== */
+    #captureCard { background: none; border: none; box-shadow: none; padding: 0; }
+    #captureCard:hover { border: none; }
+    .cap-section {
+      background: linear-gradient(160deg, #202030 0%, #181825 100%);
+      border: 1px solid rgba(201, 168, 76, 0.14); border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.05);
+      padding: 16px; margin-bottom: 14px; transition: border-color 0.2s;
+    }
+    .cap-section:hover { border-color: rgba(201, 168, 76, 0.28); }
+    .cap-section > .card-title:first-child { margin-top: 0 !important; }
+    /* items inside a panel (each co-applicant, reference, property and verification card) */
+    .co-applicant-card, .reference-card, .property-card, .verification-card {
+      background: linear-gradient(160deg, #1a1a28 0%, #12121c 100%);
+      border: 1px solid rgba(201, 168, 76, 0.16); border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 215, 0, 0.04);
+    }
+    .unlock-status {
+      background: linear-gradient(160deg, #202030 0%, #181825 100%);
+      border: 1px solid rgba(201, 168, 76, 0.14); border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.05);
+      padding: 14px 16px; margin-bottom: 14px;
+    }
+    .kyc-request-banner { border-radius: 18px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); margin-bottom: 14px; }
   </style>
 <script>
 (function () {
@@ -2706,6 +2731,7 @@
           </div>
 
 
+          <div class="cap-section">
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-user"></i> Personal Details</div>
           <div class="form-group">
             <label>Full name</label>
@@ -2802,6 +2828,9 @@
             <div class="range-hint">For Government employees only. Max 58+5 years extension.</div>
           </div>
 
+          </div>
+
+          <div class="cap-section">
           <!-- CO-APPLICANTS -->
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-user-friends"></i> Co-applicants <span style="color:#6a5f48; font-weight:400; text-transform:none; font-size:11px;">(add multiple)</span></div>
           <div id="coApplicantsContainer">
@@ -2894,6 +2923,9 @@
           <button class="btn-success btn-sm" id="addCoApplicantBtn" style="width:100%;"><i class="fas fa-plus"></i> Add Co-applicant</button>
           <div id="coFeedback" style="font-size:11px; color:#6a5f48; margin-top:4px;"></div>
 
+          </div>
+
+          <div class="cap-section">
           <!-- REFERENCES -->
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-address-book"></i> References <span style="color:#6a5f48; font-weight:400; text-transform:none; font-size:11px;">(2 required)</span></div>
           <div id="referencesContainer">
@@ -2956,6 +2988,8 @@
           </div>
           <div id="refFeedback" style="font-size:11px; color:#6a5f48; margin-top:4px;"></div>
 
+          </div>
+
           <!-- KYC BANNER -->
           <div id="kycRequestBanner" class="kyc-request-banner">
             <div class="banner-title">📋 KYC & Income Documents Required</div>
@@ -2969,7 +3003,7 @@
           </div>
 
           <!-- VERIFICATION & ASSESSMENT -->
-          <div id="verificationSectionWrapper">
+          <div id="verificationSectionWrapper" class="cap-section">
             <div class="card-title" style="margin-top:8px;"><i class="fas fa-clipboard-check"></i> Verification & Assessment <span style="color:#6a5f48; font-weight:400; text-transform:none; font-size:11px;">(unlocked after KYC approved)</span></div>
 
             <div id="verificationBanner" class="final-sanction-banner" style="display:none;">
@@ -3075,7 +3109,7 @@
           </div>
 
           <!-- PROPERTY MORTGAGE SECTION -->
-          <div id="propertySectionWrapper">
+          <div id="propertySectionWrapper" class="cap-section">
             <div class="card-title" style="margin-top:8px;"><i class="fas fa-home"></i> Property Mortgage <span style="color:#6a5f48; font-weight:400; text-transform:none; font-size:11px;">(unlocked after verification & assessment approved)</span></div>
 
             <div id="finalSanctionBanner" class="final-sanction-banner" style="display:none;">
@@ -3436,6 +3470,7 @@
             </div>
           </div>
 
+          <div class="cap-section">
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-file-invoice"></i> Loan details</div>
           <div class="form-group">
             <label>Loan type</label>
@@ -3520,6 +3555,9 @@
             </select>
           </div>
 
+          </div>
+
+          <div class="cap-section">
           <!-- ASSIGN TO BUSINESS ASSOCIATE -->
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-user-tie"></i> Assign to</div>
           <div class="form-group">
@@ -3571,6 +3609,9 @@
             </div>
           </div>
 
+          </div>
+
+          <div class="cap-section">
           <!-- PROFILE TYPE (drives channel mapping) -->
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-random"></i> Profile type</div>
           <div class="profile-flags" id="profileFlags">
@@ -3581,6 +3622,9 @@
           </div>
           <div class="channel-note" id="channelRuleNote" style="display:none;"></div>
 
+          </div>
+
+          <div class="cap-section">
           <!-- INSTITUTION SELECTION -->
           <div class="card-title" style="margin-top:8px;"><i class="fas fa-university"></i> Select Institution</div>
           <div class="form-group">
@@ -3599,6 +3643,7 @@
 
           <button class="btn-primary" id="saveLeadBtn"><i class="fas fa-bolt"></i> Save & pre-qualify</button>
           <div id="captureFeedback" style="margin-top:12px; font-size:14px; color:#c9a84c;"></div>
+          </div>
         </div>
         <div style="font-size:11px; color:#4a4250; text-align:center; margin-top:-6px; letter-spacing:0.5px;">⚡ auto pre-qualification on save</div>
       </div>
