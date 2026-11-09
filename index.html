@@ -4668,7 +4668,8 @@
       function statCard(label, value) {
         const icons = { 'Total Leads': 'fa-users', 'SANCTIONED': 'fa-gem', 'Declined': 'fa-ban', 'In Progress': 'fa-hourglass-half',
           'Conversion': 'fa-percent', 'Avg Ticket': 'fa-ticket-alt', 'Sanctioned Leads': 'fa-gem',
-          'Total Sanctioned': 'fa-rupee-sign', 'Avg Sanctioned': 'fa-chart-line' };
+          'Total Sanctioned': 'fa-rupee-sign', 'Avg Sanctioned': 'fa-chart-line', 'Sanctioned': 'fa-gem', 'Fully Disbursed': 'fa-check-double',
+          'This Month': 'fa-calendar-alt', 'Sanction Value': 'fa-rupee-sign', 'Disbursed': 'fa-money-bill-wave', 'Balance Due': 'fa-balance-scale' };
         return `<div class="stat-card"><i class="fas ${icons[label] || 'fa-circle'}"></i>
           <div class="stat-value">${value}</div>
           <div class="stat-label">${escapeHtml(label)}</div>
@@ -4749,6 +4750,7 @@
               ${statCard('Avg Sanctioned', fmtCr(avgSanctioned))}
             </div>
           </div>
+          ${postSanctionReportCard(scopedLeads)}
           <div class="card" style="margin-bottom:6px;">
             <div class="card-title"><i class="fas fa-file-signature"></i> Evaluation Reports by Status</div>
             ${donutRow(Object.entries(byReportStatus).sort((a, b) => b[1] - a[1]), 'No evaluation reports yet.')}
@@ -6216,6 +6218,54 @@
       // 15. PIPELINE RENDER
       // ================================================================
       let pipelineView = 'all', postSort = 'action';
+      // Reports screen: post-sanction & disbursement summary for the leads this role can see
+      function postSanctionReportCard(scopedLeads) {
+        const psLeads = scopedLeads.filter(isSanctioned);
+        const head = '<div class="card-title"><i class="fas fa-hand-holding-usd"></i> Post-sanction & Disbursement</div>';
+        if (!psLeads.length) return `<div class="card" style="margin-bottom:12px;">${head}<div style="color:#6a5f48; text-align:center; padding:12px; font-size:13px;">No sanctioned leads yet.</div></div>`;
+        const info = psLeads.map(l => ({ l, t: getSanctionTerms(l), st: postSanctionState(l) }));
+        const sum = a => a.reduce((x, y) => x + y, 0);
+        const sanctionValue = sum(info.map(x => x.t.amount));
+        const disbursed = sum(info.map(x => x.st.disb.total));
+        const balance = sum(info.filter(x => !x.st.disb.closed).map(x => x.st.disb.balance));
+        const fullCount = info.filter(x => x.st.disb.full).length;
+        const now = new Date();
+        const releases = [];
+        info.forEach(x => x.st.disb.list.forEach(r => releases.push({ name: x.l.borrower.name, amount: Number(r.amount) || 0, date: r.date })));
+        const thisMonth = sum(releases.filter(r => { const d = new Date(r.date); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).map(r => r.amount));
+        const order = ['Sanctioned', 'Letter issued', 'Customer accepted', 'Documentation done', 'Disbursing', 'Disbursed'];
+        const stageOf = x => {
+          if (x.st.disb.full) return 'Disbursed';
+          if (x.st.disb.list.length) return 'Disbursing';
+          if (x.st.ps.docs) return 'Documentation done';
+          if (x.st.ps.accepted) return 'Customer accepted';
+          if (x.st.ps.letter) return 'Letter issued';
+          return 'Sanctioned';
+        };
+        const byStage = {};
+        info.forEach(x => { const k = stageOf(x); byStage[k] = (byStage[k] || 0) + 1; });
+        const pct = sanctionValue ? Math.min(100, Math.round(disbursed / sanctionValue * 100)) : 0;
+        const recent = releases.filter(r => r.date).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+        return `<div class="card" style="margin-bottom:12px;">
+          ${head}
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            ${statCard('Sanctioned', psLeads.length)}
+            ${statCard('Fully Disbursed', fullCount)}
+            ${statCard('This Month', fmtCr(thisMonth))}
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            ${statCard('Sanction Value', fmtCr(sanctionValue))}
+            ${statCard('Disbursed', fmtCr(disbursed))}
+            ${statCard('Balance Due', fmtCr(balance))}
+          </div>
+          <div style="font-size:11px; color:#a89b7a; display:flex; justify-content:space-between;"><span>Disbursed vs sanctioned</span><b style="color:#e6c566;">${pct}%</b></div>
+          <div class="sc-bar"><i style="width:${pct}%"></i></div>
+          <div class="card-title" style="margin-top:12px; font-size:12px;">Where each case stands</div>
+          ${donutRow(order.filter(k => byStage[k]).map(k => [k, byStage[k]]), 'No data.')}
+          ${recent.length ? `<div class="card-title" style="margin-top:12px; font-size:12px;">Recent releases</div>
+            <div>${recent.map(r => `<div class="detail-row"><span>${escapeHtml(r.name)} · ${escapeHtml(fmtDateShort(r.date))}</span><span>₹${r.amount.toLocaleString('en-IN')}</span></div>`).join('')}</div>` : ''}
+        </div>`;
+      }
       function postSanctionListHtml(list) {
         if (!list.length) return '<div style="color:#6a5f48; text-align:center; padding:20px;">No sanctioned leads yet.</div>';
         const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
@@ -9079,9 +9129,9 @@
           const dStatus = di.full ? (di.balance > 1 ? 'Part (closed)' : 'Complete') : di.list.length ? 'In progress' : 'Not started';
           psRows.push({
             'Lead ID': l.id, 'Client Name': l.borrower.name, 'Lender': t.banker || l.institutionName || '', 'Sanction Date': sanDate,
-            'Sanction Amount (₹)': Math.round(t.amount), 'Term (months)': t.months || '', 'ROI (% p.a.)': t.roi || '', 'EMI (₹)': Math.round(t.emi),
+            'Sanction Amount (₹)': t.amount ? Math.round(t.amount) : '', 'Term (months)': t.months || '', 'ROI (% p.a.)': t.roi || '', 'EMI (₹)': t.emi ? Math.round(t.emi) : '',
             'Letter Issued': yn(getPS(l).letter), 'Customer Accepted': yn(getPS(l).accepted), 'Documentation Done': yn(getPS(l).docs),
-            'Disbursement Status': dStatus, 'Total Disbursed (₹)': Math.round(di.total), 'Balance to Disburse (₹)': di.closed ? Math.round(di.balance) : Math.round(di.balance),
+            'Disbursement Status': dStatus, 'Total Disbursed (₹)': Math.round(di.total), 'Balance to Disburse (₹)': t.amount ? Math.round(di.balance) : '',
             'Releases': di.list.length, 'Progress': st.done + '/' + st.total, 'File Closed': yn(di.closed)
           });
           let cum = 0;
