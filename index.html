@@ -7146,8 +7146,11 @@
         const isFinal = !!document.getElementById('disbFinal')?.checked;
         if (!(amount > 0)) { alert('Enter the amount released.'); return; }
         if (!dateStr) { alert('Choose the release date.'); return; }
-        const when = new Date(dateStr + 'T12:00:00');
-        if (isNaN(when) || when > new Date()) { alert('The release date cannot be in the future.'); return; }
+        const nowD = new Date(); nowD.setMinutes(nowD.getMinutes() - nowD.getTimezoneOffset());
+        const todayStr = nowD.toISOString().slice(0, 10);
+        // a release dated today is stored with the current time; an earlier date is stored at noon
+        const when = dateStr === todayStr ? new Date() : new Date(dateStr + 'T12:00:00');
+        if (isNaN(when) || dateStr > todayStr) { alert('The release date cannot be in the future.'); return; }
         lead.borrower = lead.borrower || {};
         const before = disbursementInfo(lead);
         const ps0 = getPS(lead);
@@ -8519,7 +8522,7 @@
           gr.addColorStop(0, '#E6C566'); gr.addColorStop(1, '#B38F36');
           g.fillStyle = gr; xlRoundRectPath(g, x, y, bw, bh, Math.min(6, bw / 3)); g.fill();
           g.fillStyle = '#14141E'; g.font = '700 12px ' + XL_CHART_FONT; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-          g.fillText(String(it.value), x + bw / 2, y - 5);
+          g.fillText(it.text !== undefined ? it.text : String(it.value), x + bw / 2, y - 5);
           g.fillStyle = '#4A4A5C'; g.font = '11px ' + XL_CHART_FONT;
           g.fillText(it.label, x + bw / 2, h - bottom + 16);
           g.fillStyle = '#7A7260'; g.font = '10px ' + XL_CHART_FONT;
@@ -8541,6 +8544,8 @@
         const stageR = rng(L, 'Stage'), loanR = rng(L, 'Loan Amount (₹)'), idR = rng(L, 'Lead ID'),
           typeR = rng(L, 'Loan Type'), chanR = rng(L, 'Channel'), baR = rng(L, 'Assigned BA'), createdR = rng(L, 'Created');
 
+        const P = sheets.find(s => s.name === 'Post-sanction');
+        const D = sheets.find(s => s.name === 'Disbursements');
         const ws = wb.addWorksheet('Dashboard', {
           properties: { tabColor: { argb: XL.ink } },
           views: [{ showGridLines: false }],
@@ -8611,6 +8616,21 @@
         ]);
         ws.getRow(14).height = 8;
         let next = 15;
+        if (P && P.rows.length) {
+          const pr = h => rng(P, h);
+          const psSan = sum(P.rows.map(x => Number(x['Sanction Amount (₹)']) || 0));
+          const psDis = sum(P.rows.map(x => Number(x['Total Disbursed (₹)']) || 0));
+          const psBal = sum(P.rows.map(x => Number(x['Balance to Disburse (₹)']) || 0));
+          tileRow(15, [
+            ['Sanctioned leads', P.rows.length, '0', 'COUNTA(' + pr('Lead ID') + ')'],
+            ['Sanction value', psSan, XL_INR, 'SUM(' + pr('Sanction Amount (₹)') + ')'],
+            ['Disbursed', psDis, XL_INR, 'SUM(' + pr('Total Disbursed (₹)') + ')'],
+            ['Balance to disburse', psBal, XL_INR, 'SUM(' + pr('Balance to Disburse (₹)') + ')'],
+            ['Disbursed %', psSan ? psDis / psSan : 0, '0.0%', 'IFERROR(SUM(' + pr('Total Disbursed (₹)') + ')/SUM(' + pr('Sanction Amount (₹)') + '),0)']
+          ]);
+          ws.getRow(19).height = 8;
+          next = 20;
+        }
 
         // ---- charts ----
         const countBy = kind => {
@@ -8657,6 +8677,25 @@
             place(c1, 0, next); place(c2, W + GAP, next);
             place(c3, 0, next + rowsFor + 1); place(c4, W + GAP, next + rowsFor + 1);
             next += rowsFor * 2 + 2;
+            if (P && P.rows.length) {
+              const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              for (let i = 0; i < rowsFor + 1; i++) ws.getRow(next + i).height = i === rowsFor ? 8 : rowPt;
+              const stageOfP = x => (x['Disbursement Status'] === 'Complete' || x['Disbursement Status'] === 'Part (closed)') ? 'Disbursed'
+                : x['Disbursement Status'] === 'In progress' ? 'Disbursing'
+                : x['Documentation Done'] === 'Yes' ? 'Documentation done'
+                : x['Customer Accepted'] === 'Yes' ? 'Customer accepted'
+                : x['Letter Issued'] === 'Yes' ? 'Letter issued' : 'Sanctioned';
+              const stageColors = { 'Sanctioned': '#C9A84C', 'Letter issued': '#5B8FD6', 'Customer accepted': '#9B7BD1', 'Documentation done': '#4FB3BF', 'Disbursing': '#D98C5F', 'Disbursed': '#4FB286' };
+              const stageItems = Object.keys(stageColors).map(k => ({ label: k, value: P.rows.filter(x => stageOfP(x) === k).length, color: stageColors[k] })).filter(i => i.value > 0);
+              const c5 = xlDonutChart(W, H, 'Post-sanction stages', stageItems);
+              const c6 = xlColumnsChart(W, H, 'Disbursed per month (last 6)', months.map(mo => {
+                const rr = (D ? D.rows : []).filter(x => x['Release Date'] && x['Release Date'] >= mo.d && x['Release Date'] < new Date(Date.UTC(mo.y, mo.m, 1)));
+                const amt = sum(rr.map(x => Number(x['Release Amount (₹)']) || 0));
+                return { label: MON[mo.m - 1], value: amt, text: amt ? xlShort(amt) : '0', sub: rr.length + (rr.length === 1 ? ' release' : ' releases') };
+              }));
+              place(c5, 0, next); place(c6, W + GAP, next);
+              next += rowsFor + 2;
+            }
           } catch (e) { /* charts are optional */ }
         }
 
@@ -8751,7 +8790,6 @@
         next = dtable(next, 'By channel', H5('Channel', 'Share'), breakdown('Channel', chanR, chanKeys, 'channel'), 'C');
 
         // Post-sanction progress (from the Post-sanction sheet)
-        const P = sheets.find(s => s.name === 'Post-sanction');
         if (P && P.rows.length) {
           const idP = rng(P, 'Lead ID'), amtP = rng(P, 'Sanction Amount (₹)'), disbP = rng(P, 'Total Disbursed (₹)');
           const stepDefs = [['Sanctioned leads', null, null], ['Letter issued', 'Letter Issued', 'Yes'], ['Customer accepted', 'Customer Accepted', 'Yes'],
@@ -8775,6 +8813,66 @@
             return { rows, total: [
               { v: 'BALANCE TO DISBURSE' }, { v: '' }, { v: '' }, { v: '' },
               { v: F('E' + r0 + '-F' + r0, totSan - totDis), a: 'r', fmt: XL_INR }] };
+          }, 'C');
+
+          // Disbursement by month (from the Disbursements sheet)
+          if (D && D.rows.length) {
+            const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const relDateR = rng(D, 'Release Date'), relAmtR = rng(D, 'Release Amount (₹)');
+            const inRel = (x, mo) => x['Release Date'] && x['Release Date'] >= mo.d && x['Release Date'] < new Date(Date.UTC(mo.y, mo.m, 1));
+            next = dtable(next, 'Disbursement by month (last 6 months)', ['Month', 'Releases', 'Disbursed', 'Share', 'Avg release'], r0 => {
+              const rl = r0 + months.length - 1, tr = rl + 1;
+              const totalAmt = sum(months.map(mo => sum(D.rows.filter(x => inRel(x, mo)).map(x => Number(x['Release Amount (₹)']) || 0))));
+              const totalCnt = sum(months.map(mo => D.rows.filter(x => inRel(x, mo)).length));
+              const rows = months.map((mo, i) => {
+                const r = r0 + i;
+                const crit = relDateR + ',">="&DATE(' + mo.y + ',' + mo.m + ',1),' + relDateR + ',"<"&DATE(' + mo.y + ',' + (mo.m + 1) + ',1)';
+                const rr = D.rows.filter(x => inRel(x, mo)), c = rr.length, v = sum(rr.map(x => Number(x['Release Amount (₹)']) || 0));
+                return [
+                  { v: MONTHS[mo.m - 1] + ' ' + mo.y, bold: true },
+                  { v: F('COUNTIFS(' + crit + ')', c), a: 'c', bold: true },
+                  { v: F('SUMIFS(' + relAmtR + ',' + crit + ')', v), a: 'r', fmt: XL_INR },
+                  { v: F('IFERROR(D' + r + '/SUM($D$' + r0 + ':$D$' + rl + '),0)', totalAmt ? v / totalAmt : 0), a: 'c', fmt: '0.0%' },
+                  { v: F('IFERROR(D' + r + '/C' + r + ',0)', c ? v / c : 0), a: 'r', fmt: XL_INR }
+                ];
+              });
+              return { rows, total: [
+                { v: 'TOTAL' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', totalCnt), a: 'c' },
+                { v: F('SUM(D' + r0 + ':D' + rl + ')', totalAmt), a: 'r', fmt: XL_INR },
+                { v: F('SUM(E' + r0 + ':E' + rl + ')', totalAmt ? 1 : 0), a: 'c', fmt: '0.0%' },
+                { v: F('IFERROR(D' + tr + '/C' + tr + ',0)', totalCnt ? totalAmt / totalCnt : 0), a: 'r', fmt: XL_INR }] };
+            }, 'C');
+          }
+
+          // Post-sanction by lender
+          const lenR = rng(P, 'Lender');
+          const lenderNames = (() => {
+            const m = {};
+            P.rows.forEach(x => { const k = x['Lender'] || 'Not recorded'; m[k] = (m[k] || 0) + (Number(x['Sanction Amount (₹)']) || 0); });
+            return Object.keys(m).sort((a, b) => m[b] - m[a]).slice(0, 8);
+          })();
+          next = dtable(next, 'Post-sanction by lender', ['Lender', 'Leads', 'Sanction value', 'Disbursed', 'Balance'], r0 => {
+            const rl = r0 + lenderNames.length - 1, tr = rl + 1;
+            const inL = (x, k) => (x['Lender'] || 'Not recorded') === k;
+            const rows = lenderNames.map((k, i) => {
+              const r = r0 + i, crit = k === 'Not recorded' ? '""' : 'B' + r;
+              const m = P.rows.filter(x => inL(x, k));
+              const san = sum(m.map(x => Number(x['Sanction Amount (₹)']) || 0)), dis = sum(m.map(x => Number(x['Total Disbursed (₹)']) || 0));
+              return [
+                { v: k, bold: true },
+                { v: F('COUNTIF(' + lenR + ',' + crit + ')', m.length), a: 'c', bold: true },
+                { v: F('SUMIF(' + lenR + ',' + crit + ',' + amtP + ')', san), a: 'r', fmt: XL_INR },
+                { v: F('SUMIF(' + lenR + ',' + crit + ',' + disbP + ')', dis), a: 'r', fmt: XL_INR },
+                { v: F('D' + r + '-E' + r, san - dis), a: 'r', fmt: XL_INR }
+              ];
+            });
+            const tl = lenderNames.length ? P.rows.length : 0;
+            const tSan = sum(P.rows.map(x => Number(x['Sanction Amount (₹)']) || 0)), tDis = sum(P.rows.map(x => Number(x['Total Disbursed (₹)']) || 0));
+            return { rows, total: [
+              { v: 'TOTAL' }, { v: F('SUM(C' + r0 + ':C' + rl + ')', tl), a: 'c' },
+              { v: F('SUM(D' + r0 + ':D' + rl + ')', tSan), a: 'r', fmt: XL_INR },
+              { v: F('SUM(E' + r0 + ':E' + rl + ')', tDis), a: 'r', fmt: XL_INR },
+              { v: F('D' + tr + '-E' + tr, tSan - tDis), a: 'r', fmt: XL_INR }] };
           }, 'C');
         }
 
