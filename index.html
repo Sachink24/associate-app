@@ -3996,7 +3996,6 @@
           credit_roi: lead.creditROI || null,
           credit_fees: lead.creditFees || null,
           credit_conditions: lead.creditConditions || null,
-          post_sanction: getPS(lead),
           credit_observation: lead.creditObservation || null,
           credit_recommendation: lead.creditRecommendation || null,
           legal_observation: lead.legalObservation || null,
@@ -4273,21 +4272,35 @@
         if (activeScreen === 'screen-reports' && typeof renderReports === 'function') renderReports();
       }
 
+      // Pulls the latest leads (including post-sanction progress and disbursements recorded in the Admin
+      // Panel or by other associates) and refreshes the screens. An open lead is refreshed only when its
+      // post-sanction data changed, and never while you are typing in it.
+      async function reloadLeadsLive() {
+        if (!sb || syncInFlight) return;
+        const openId = detailLeadId;
+        const openBefore = openId != null ? leads.find(l => l.id === openId) : null;
+        const prevPS = openBefore ? JSON.stringify(getPS(openBefore)) : null;
+        const res = await sb.from('leads').select('*').order('id', { ascending: true });
+        if (res.error || !res.data) return;
+        leads = res.data.map(rowToLead);
+        nextId = Math.max(nextId, ...(leads.length ? leads.map(l => l.id) : [0])) + 1;
+        saveToStorage(STORAGE_KEYS.leads, leads);
+        refreshLiveScreens();
+        if (openId != null) {
+          const fresh = leads.find(l => l.id === openId);
+          const dv = document.getElementById('detailView');
+          const typing = dv && document.activeElement && dv.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+          if (fresh && dv && dv.style.display !== 'none' && !typing && JSON.stringify(getPS(fresh)) !== prevPS) showDetail(fresh);
+        }
+      }
+
       function subscribeToLeadChanges() {
         if (!sb) return;
         sb.channel('leads-live-sync')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-            if (syncInFlight) return;
-            sb.from('leads').select('*').order('id', { ascending: true }).then(({ data, error }) => {
-              if (!error && data) {
-                leads = data.map(rowToLead);
-                nextId = Math.max(nextId, ...(leads.length ? leads.map(l => l.id) : [0])) + 1;
-                saveToStorage(STORAGE_KEYS.leads, leads);
-                refreshLiveScreens();
-              }
-            });
-          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => { reloadLeadsLive(); })
           .subscribe();
+        // coming back to the app (or a phone waking up) also pulls the latest data
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reloadLeadsLive(); });
 
         // Live sync: final sanctions (written by Admin Panel)
         sb.channel('sanctions-live-sync')
@@ -6218,6 +6231,7 @@
       // 15. PIPELINE RENDER
       // ================================================================
       let pipelineView = 'all', postSort = 'action';
+      let detailLeadId = null; // lead shown in the Pipeline detail view (null when another detail is open)
       // Reports screen: post-sanction & disbursement summary for the leads this role can see
       function postSanctionReportCard(scopedLeads) {
         const psLeads = scopedLeads.filter(isSanctioned);
@@ -6531,6 +6545,7 @@
       function openLegalReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
+        detailLeadId = null;
         const status = lead.status || 'NEW';
         const editable = currentRole === 'legal' && ['NEW','LEGAL_REVIEW','LEGAL_REWORK'].includes(status);
         const adminCanRework = currentRole === 'owner' && lead.legalSubmitted && !['APPROVED','REJECTED'].includes(status);
@@ -6584,6 +6599,7 @@
       function openTechnicalReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
+        detailLeadId = null;
         const status = lead.status || 'NEW';
         const editable = currentRole === 'technical' && ['TECHNICAL_REVIEW','TECHNICAL_REWORK'].includes(status);
         const adminCanRework = currentRole === 'owner' && lead.technicalSubmitted && !['APPROVED','REJECTED'].includes(status);
@@ -6639,6 +6655,7 @@
       function openCreditReport(lead) {
         const detailView = document.getElementById('detailView');
         detailView.style.display = 'block';
+        detailLeadId = null;
         const status = lead.status || 'NEW';
         const editable = currentRole === 'credit' && ['NEW','IN_REVIEW','CREDIT_REVIEW','CREDIT_REWORK'].includes(status);
         const adminCanDecide = (currentRole === 'owner') && ['CREDIT_SUBMITTED_FOR_APPROVAL','ADMIN_REVIEW'].includes(status);
@@ -7107,39 +7124,68 @@
             <button class="btn-secondary btn-sm" id="shareSanctionBtn" style="width:100%; margin-top:8px;">📤 Share sanction details</button>
           </div>`;
       }
-      function togglePostSanctionStep(lead, key) {
-        if (!(currentRole === 'owner' || currentRole === 'business')) return;
-        lead.borrower = lead.borrower || {};
-        const ps = Object.assign({}, getPS(lead));
+      // Writes ONLY leads.post_sanction. It first reads the latest saved value (so a release recorded
+      // in the Admin Panel or by another associate is never overwritten), applies the change, then saves.
+      async function savePostSanction(lead, mutator) {
+        const apply = (ps) => mutator(ps) !== false;
+        let ps;
+        if (sb) {
+          const cur = await sb.from('leads').select('post_sanction').eq('id', lead.id).maybeSingle();
+          if (cur.error) { alert('Could not read the latest data: ' + cur.error.message); return false; }
+          ps = Object.assign({}, (cur.data && cur.data.post_sanction && Object.keys(cur.data.post_sanction).length) ? cur.data.post_sanction : getPS(lead));
+          if (!apply(ps)) return false;
+          ps._rev = (Number(ps._rev) || 0) + 1; // revision number: the database rejects a stale save
+          const upd = await sb.from('leads').update({ post_sanction: ps }).eq('id', lead.id);
+          if (upd.error) {
+            alert(upd.error.code === '40001' ? upd.error.message : 'Could not save: ' + upd.error.message);
+            if (upd.error.code === '40001') reloadLeadsLive();
+            return false;
+          }
+        } else {
+          ps = Object.assign({}, getPS(lead));
+          if (!apply(ps)) return false;
+        }
         setPS(lead, ps);
+        const mine = leads.find(l => l.id === lead.id);
+        if (mine && mine !== lead) setPS(mine, ps);
+        saveToStorage(STORAGE_KEYS.leads, leads);
+        return true;
+      }
+      async function togglePostSanctionStep(lead, key) {
+        if (!(currentRole === 'owner' || currentRole === 'business')) return;
         const idx = POST_SANCTION_STEPS.findIndex(x => x.key === key);
         if (idx < 0) return;
-        if (key === 'disbursed') {
-          // remove the latest release (releases are added with the form)
-          const di = disbursementInfo(lead);
-          if (!di.list.length) return;
-          const last = di.list[di.list.length - 1];
-          if (!confirm('Remove the latest release of ₹' + (Number(last.amount) || 0).toLocaleString('en-IN') + '?')) return;
-          const list = di.list.slice(0, -1);
-          ps.disbursements = list;
-          delete ps.disbursed;
-          delete ps.disbursementClosed;
-          addFeed('↩️ Release removed — ' + lead.borrower.name);
-        } else if (ps[key]) {
-          // undo only the latest done step, so the order stays valid
-          if (POST_SANCTION_STEPS.slice(idx + 1).some(x => stepDone(lead, x.key))) { alert('Undo the later steps first.'); return; }
-          delete ps[key];
-          addFeed('↩️ ' + POST_SANCTION_STEPS[idx].label + ' — ' + lead.borrower.name);
-        } else {
-          if (idx > 0 && !stepDone(lead, POST_SANCTION_STEPS[idx - 1].key)) { alert('Complete the earlier step first.'); return; }
-          ps[key] = { date: new Date().toISOString(), by: (currentUserData && currentUserData.name) || currentUser || '' };
-          addFeed('✅ ' + POST_SANCTION_STEPS[idx].label + ' — ' + lead.borrower.name);
-        }
-        persistAll();
+        const name = (lead.borrower && lead.borrower.name) || 'Lead';
+        let feedMsg = '';
+        const ok = await savePostSanction(lead, (ps) => {
+          const probe = Object.assign({}, lead, { postSanction: ps });
+          if (key === 'disbursed') {
+            // remove the latest release (releases are added with the form)
+            const di = disbursementInfo(probe);
+            if (!di.list.length) return false;
+            const last = di.list[di.list.length - 1];
+            if (!confirm('Remove the latest release of ₹' + (Number(last.amount) || 0).toLocaleString('en-IN') + '?')) return false;
+            ps.disbursements = di.list.slice(0, -1);
+            delete ps.disbursed;
+            delete ps.disbursementClosed;
+            feedMsg = '↩️ Release removed — ' + name;
+          } else if (ps[key]) {
+            // undo only the latest done step, so the order stays valid
+            if (POST_SANCTION_STEPS.slice(idx + 1).some(x => stepDone(probe, x.key))) { alert('Undo the later steps first.'); return false; }
+            delete ps[key];
+            feedMsg = '↩️ ' + POST_SANCTION_STEPS[idx].label + ' — ' + name;
+          } else {
+            if (idx > 0 && !stepDone(probe, POST_SANCTION_STEPS[idx - 1].key)) { alert('Complete the earlier step first.'); return false; }
+            ps[key] = { date: new Date().toISOString(), by: (currentUserData && currentUserData.name) || currentUser || '' };
+            feedMsg = '✅ ' + POST_SANCTION_STEPS[idx].label + ' — ' + name;
+          }
+        });
+        if (!ok) return;
+        addFeed(feedMsg);
         renderPipeline();
         showDetail(lead);
       }
-      function markDisbursed(lead) {
+      async function markDisbursed(lead) {
         if (!(currentRole === 'owner' || currentRole === 'business')) return;
         const amount = Math.round(Number(document.getElementById('disbAmount')?.value) || 0);
         const dateStr = document.getElementById('disbDate')?.value || '';
@@ -7151,19 +7197,19 @@
         // a release dated today is stored with the current time; an earlier date is stored at noon
         const when = dateStr === todayStr ? new Date() : new Date(dateStr + 'T12:00:00');
         if (isNaN(when) || dateStr > todayStr) { alert('The release date cannot be in the future.'); return; }
-        lead.borrower = lead.borrower || {};
-        const before = disbursementInfo(lead);
-        const ps0 = getPS(lead);
-        if (!ps0.docs) { alert('Complete the agreement and documentation step first.'); return; }
-        if (before.amount && before.total + amount > before.amount + 1 &&
-            !confirm('Total released would be ₹' + (before.total + amount).toLocaleString('en-IN') + ', more than the sanctioned ₹' + Math.round(before.amount).toLocaleString('en-IN') + '. Continue?')) return;
-        const ps = Object.assign({}, ps0);
-        setPS(lead, ps);
-        ps.disbursements = before.list.concat([{ date: when.toISOString(), amount, by: (currentUserData && currentUserData.name) || currentUser || '' }]);
-        delete ps.disbursed;
-        if (isFinal) ps.disbursementClosed = { date: new Date().toISOString(), by: (currentUserData && currentUserData.name) || currentUser || '' };
-        addFeed('💸 Released ₹' + amount.toLocaleString('en-IN') + ' — ' + lead.borrower.name);
-        persistAll();
+        const who = (currentUserData && currentUserData.name) || currentUser || '';
+        const ok = await savePostSanction(lead, (ps) => {
+          const probe = Object.assign({}, lead, { postSanction: ps });
+          if (!ps.docs) { alert('Complete the agreement and documentation step first.'); return false; }
+          const before = disbursementInfo(probe);
+          if (before.amount && before.total + amount > before.amount + 1 &&
+              !confirm('Total released would be ₹' + (before.total + amount).toLocaleString('en-IN') + ', more than the sanctioned ₹' + Math.round(before.amount).toLocaleString('en-IN') + '. Continue?')) return false;
+          ps.disbursements = before.list.concat([{ date: when.toISOString(), amount, by: who }]);
+          delete ps.disbursed;
+          if (isFinal) ps.disbursementClosed = { date: new Date().toISOString(), by: who };
+        });
+        if (!ok) return;
+        addFeed('💸 Released ₹' + amount.toLocaleString('en-IN') + ' — ' + ((lead.borrower && lead.borrower.name) || 'Lead'));
         renderPipeline();
         showDetail(lead);
       }
@@ -7184,6 +7230,7 @@
 
       function showDetail(lead) {
         const detailView = document.getElementById('detailView');
+        detailLeadId = lead.id;
         updateSimulatorLead(lead);
         detailView.style.display = 'block';
         const isBT = lead.loanType === 'Balance Transfer + Top Up';
