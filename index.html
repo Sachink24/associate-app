@@ -6995,8 +6995,16 @@
         { key: 'docs', icon: '📑', label: 'Agreement & documentation done' },
         { key: 'disbursed', icon: '💸', label: 'Loan disbursed' }
       ];
+      // One definition shared with the Admin Panel: a loan is "sanctioned" when it has a sanction record,
+      // or Admin has approved it (stage SANCTIONED / DISBURSED, status APPROVED), or post-sanction progress
+      // was already recorded. (Stage "Approved" alone is only the associate-level approval, not a sanction.)
       function isSanctioned(lead) {
-        return !!getSanctionForLead(lead.id) || lead.stage === 'Approved' || String(lead.adminStatus || '').toLowerCase() === 'approved';
+        const stage = String(lead.stage || '').trim().toLowerCase();
+        const status = String(lead.status || '').trim().toUpperCase();
+        const adminSt = String(lead.adminStatus || '').trim().toLowerCase();
+        const ps = getPS(lead);
+        return !!getSanctionForLead(lead.id) || stage === 'sanctioned' || stage === 'disbursed' ||
+          status === 'APPROVED' || adminSt === 'approved' || Object.keys(ps).some(function (k) { return k !== '_rev'; });
       }
       function emiFor(principal, annualRoi, months) {
         const P = Number(principal) || 0, n = Math.round(Number(months) || 0), r = (Number(annualRoi) || 0) / 1200;
@@ -7008,7 +7016,7 @@
       function getSanctionTerms(lead) {
         const sn = getSanctionForLead(lead.id) || {};
         const pick = (...vals) => { for (const v of vals) { const x = Number(v); if (x > 0) return x; } return 0; };
-        const amount = pick(sn.sanction_amount, lead.creditLoanAmount);
+        const amount = pick(sn.sanction_amount, lead.creditLoanAmount, lead.loanAmount);
         const months = pick(sn.tenure_months, sn.term_months, sn.tenure, sn.loan_tenure_months, lead.creditTermMonths);
         const roi = pick(sn.roi, sn.interest_rate, sn.rate_of_interest, lead.creditROI);
         const emi = pick(sn.emi) || emiFor(amount, roi, months);
